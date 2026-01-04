@@ -1,0 +1,39 @@
+# 依存関係
+node_modules/
+
+# ビルド出力
+dist/
+www/
+
+# Capacitorプラットフォーム
+android/
+ios/
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ログ
+logs/
+*.log
+npm-debug.log*
+
+# テスト
+coverage/
+
+# キャッシュ
+.cache/
+.parcel-cache/
+
