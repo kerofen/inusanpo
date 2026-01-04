@@ -15,7 +15,7 @@
  * 分割後も各セグメントは必ず連続している。
  */
 
-class LevelGenerator {
+export class LevelGenerator {
     constructor(gridSize = 6) {
         this.gridSize = gridSize;
         this.totalCells = gridSize * gridSize;
@@ -32,7 +32,7 @@ class LevelGenerator {
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const result = this.generateOnce();
-            
+
             if (result) {
                 // 厳密な検証
                 if (this.strictValidate(result)) {
@@ -51,11 +51,11 @@ class LevelGenerator {
     generateOnce() {
         // Step 1: 蛇行パスを生成（連続性保証）
         const fullPath = this.generateSnakePath();
-        
+
         // Step 2: パスを3〜4本に分割
         const numPaths = Math.random() < 0.5 ? 3 : 4;
         const segments = this.splitPathSafely(fullPath, numPaths);
-        
+
         if (!segments) return null;
 
         // Step 3: 隣接チェック
@@ -88,10 +88,10 @@ class LevelGenerator {
      */
     generateSnakePath() {
         const path = [];
-        
+
         // ランダムな開始パターンを選択
         const pattern = Math.floor(Math.random() * 4);
-        
+
         switch (pattern) {
             case 0: // 左上から、横方向蛇行
                 this.snakeHorizontal(path, 0, 1);
@@ -106,7 +106,7 @@ class LevelGenerator {
                 this.snakeVertical(path, this.gridSize - 1, -1);
                 break;
         }
-        
+
         return path;
     }
 
@@ -116,7 +116,7 @@ class LevelGenerator {
     snakeHorizontal(path, startCol, colDir) {
         for (let row = 0; row < this.gridSize; row++) {
             const goRight = (row % 2 === 0) === (colDir === 1);
-            
+
             if (goRight) {
                 for (let col = 0; col < this.gridSize; col++) {
                     path.push({ row, col });
@@ -135,7 +135,7 @@ class LevelGenerator {
     snakeVertical(path, startRow, rowDir) {
         for (let col = 0; col < this.gridSize; col++) {
             const goDown = (col % 2 === 0) === (rowDir === 1);
-            
+
             if (goDown) {
                 for (let row = 0; row < this.gridSize; row++) {
                     path.push({ row, col });
@@ -154,7 +154,7 @@ class LevelGenerator {
     splitPathSafely(fullPath, numSegments) {
         const minLen = 5; // 最小セグメント長（隣接を避けるため）
         const totalLen = fullPath.length;
-        
+
         // 分割可能か確認
         if (totalLen < numSegments * minLen) {
             return null;
@@ -163,18 +163,18 @@ class LevelGenerator {
         // 分割点を決定
         const splitPoints = [0];
         const segmentSize = Math.floor(totalLen / numSegments);
-        
+
         for (let i = 1; i < numSegments; i++) {
             // 基準位置 ± ランダムなオフセット
             const basePos = i * segmentSize;
             const offset = Math.floor(Math.random() * (segmentSize / 2)) - Math.floor(segmentSize / 4);
             let pos = basePos + offset;
-            
+
             // 範囲制限
             const minPos = splitPoints[splitPoints.length - 1] + minLen;
             const maxPos = totalLen - (numSegments - i) * minLen;
             pos = Math.max(minPos, Math.min(maxPos, pos));
-            
+
             splitPoints.push(pos);
         }
         splitPoints.push(totalLen);
@@ -185,11 +185,11 @@ class LevelGenerator {
             const start = splitPoints[i];
             const end = splitPoints[i + 1];
             const segment = fullPath.slice(start, end);
-            
+
             if (segment.length < minLen) {
                 return null; // 安全のため
             }
-            
+
             segments.push(segment);
         }
 
@@ -203,7 +203,7 @@ class LevelGenerator {
         for (const segment of segments) {
             const start = segment[0];
             const end = segment[segment.length - 1];
-            
+
             // 同じセグメントの端点が隣接しているか
             const dist = Math.abs(start.row - end.row) + Math.abs(start.col - end.col);
             if (dist <= 1) {
@@ -218,7 +218,7 @@ class LevelGenerator {
      */
     strictValidate(result) {
         const { grid, paths } = result;
-        
+
         // 1. 全マスが埋まっているか
         for (let row = 0; row < this.gridSize; row++) {
             for (let col = 0; col < this.gridSize; col++) {
@@ -228,37 +228,37 @@ class LevelGenerator {
                 }
             }
         }
-        
+
         // 2. 各パスが連続しているか
         for (const path of paths) {
             for (let i = 1; i < path.cells.length; i++) {
                 const prev = path.cells[i - 1];
                 const curr = path.cells[i];
                 const dist = Math.abs(prev.row - curr.row) + Math.abs(prev.col - curr.col);
-                
+
                 if (dist !== 1) {
                     console.log(`❌ 検証失敗: パス${path.id}が不連続 (${prev.row},${prev.col})→(${curr.row},${curr.col})`);
                     return false;
                 }
             }
         }
-        
+
         // 3. パス数が適切か
         if (paths.length < 3 || paths.length > 4) {
             console.log(`❌ 検証失敗: パス数が${paths.length}`);
             return false;
         }
-        
+
         // 4. 端点が隣接していないか
         for (const path of paths) {
-            const dist = Math.abs(path.start.row - path.end.row) + 
-                        Math.abs(path.start.col - path.end.col);
+            const dist = Math.abs(path.start.row - path.end.row) +
+                Math.abs(path.start.col - path.end.col);
             if (dist <= 1) {
                 console.log(`❌ 検証失敗: パス${path.id}の端点が隣接`);
                 return false;
             }
         }
-        
+
         // 5. グリッドとパスの整合性
         const checkGrid = this.createEmptyGrid();
         for (const path of paths) {
@@ -270,7 +270,7 @@ class LevelGenerator {
                 checkGrid[cell.row][cell.col] = path.id;
             }
         }
-        
+
         return true;
     }
 
@@ -279,7 +279,7 @@ class LevelGenerator {
      */
     formatLevelData(result, difficulty) {
         const snacks = [];
-        
+
         result.paths.forEach((path, index) => {
             const type = index + 1;
             snacks.push({
@@ -308,7 +308,7 @@ class LevelGenerator {
     // ========================================
 
     createEmptyGrid() {
-        return Array.from({ length: this.gridSize }, () => 
+        return Array.from({ length: this.gridSize }, () =>
             Array(this.gridSize).fill(0)
         );
     }
@@ -319,7 +319,7 @@ class LevelGenerator {
     visualize(levelData) {
         const grid = this.createEmptyGrid();
         const symbols = ['·', '①', '②', '③', '④'];
-        
+
         levelData.snacks.forEach(snack => {
             grid[snack.row][snack.col] = snack.type;
         });
@@ -336,10 +336,10 @@ class LevelGenerator {
      */
     visualizeSolution(levelData) {
         if (!levelData.solution) return '解答データなし';
-        
+
         const grid = this.createEmptyGrid();
         const symbols = ['·', '①', '②', '③', '④'];
-        
+
         levelData.solution.forEach((path, index) => {
             path.cells.forEach(cell => {
                 grid[cell.row][cell.col] = index + 1;
@@ -368,7 +368,7 @@ function generateTestLevels() {
 
     for (let i = 1; i <= 5; i++) {
         console.log(`\n📦 ステージ ${i} 生成中...`);
-        
+
         const level = generator.generate({
             difficulty: Math.ceil(i / 2),
             maxAttempts: 100
@@ -382,7 +382,7 @@ function generateTestLevels() {
             console.log(`✅ 生成成功！ (${level.pathCount}種類)`);
             console.log(generator.visualize(level));
             console.log(generator.visualizeSolution(level));
-            
+
             // 検証
             console.log(verifyLevel(level) ? '✅ 検証OK' : '❌ 検証NG');
         } else {
@@ -395,10 +395,10 @@ function generateTestLevels() {
 
 function verifyLevel(levelData) {
     if (!levelData.solution) return false;
-    
+
     const gridSize = levelData.gridSize;
     const grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
-    
+
     // 解答でグリッドを埋める
     for (const path of levelData.solution) {
         for (const cell of path.cells) {
@@ -409,7 +409,7 @@ function verifyLevel(levelData) {
             grid[cell.row][cell.col] = path.id;
         }
     }
-    
+
     // 空きチェック
     for (let r = 0; r < gridSize; r++) {
         for (let c = 0; c < gridSize; c++) {
@@ -419,7 +419,7 @@ function verifyLevel(levelData) {
             }
         }
     }
-    
+
     // 連続性チェック
     for (const path of levelData.solution) {
         for (let i = 1; i < path.cells.length; i++) {
@@ -432,7 +432,7 @@ function verifyLevel(levelData) {
             }
         }
     }
-    
+
     return true;
 }
 
@@ -440,11 +440,11 @@ function verifyCurrentLevel() {
     if (typeof LEVELS !== 'undefined' && LEVELS.length > 0 && window.game) {
         const level = LEVELS[window.game.currentLevel || 0];
         const generator = new LevelGenerator(level.gridSize);
-        
+
         console.log(`\n📋 レベル ${level.id} の検証`);
         console.log(generator.visualize(level));
         console.log(generator.visualizeSolution(level));
-        
+
         return verifyLevel(level);
     }
     return false;
@@ -458,20 +458,20 @@ function checkDuplicates() {
         console.log('❌ LEVELSが空です');
         return;
     }
-    
+
     console.log(`\n🔍 ${LEVELS.length}ステージの重複チェック開始...`);
     console.time('チェック時間');
-    
+
     const patterns = new Map(); // hash -> [level ids]
     let duplicateCount = 0;
-    
+
     LEVELS.forEach(level => {
         // おやつ配置のハッシュを生成
         const hash = level.snacks
             .map(s => `${s.row},${s.col},${s.type}`)
             .sort()
             .join('|');
-        
+
         if (patterns.has(hash)) {
             patterns.get(hash).push(level.id);
             duplicateCount++;
@@ -479,9 +479,9 @@ function checkDuplicates() {
             patterns.set(hash, [level.id]);
         }
     });
-    
+
     console.timeEnd('チェック時間');
-    
+
     // 重複を報告
     const duplicates = [];
     patterns.forEach((ids, hash) => {
@@ -489,7 +489,7 @@ function checkDuplicates() {
             duplicates.push({ ids, hash });
         }
     });
-    
+
     if (duplicates.length === 0) {
         console.log('✅ 重複なし！全てユニークなステージです！');
         console.log(`📊 ユニークステージ数: ${patterns.size}`);
@@ -499,7 +499,7 @@ function checkDuplicates() {
             console.log(`  ${i + 1}. ステージ ${dup.ids.join(', ')} が同じ配置`);
         });
     }
-    
+
     // 統計情報
     const stats = {
         total: LEVELS.length,
@@ -508,14 +508,14 @@ function checkDuplicates() {
         path3: LEVELS.filter(l => l.pathCount === 3).length,
         path4: LEVELS.filter(l => l.pathCount === 4).length,
     };
-    
+
     console.log('\n📊 統計情報:');
     console.log(`  総ステージ数: ${stats.total}`);
     console.log(`  ユニーク数: ${stats.unique}`);
     console.log(`  重複グループ: ${stats.duplicateGroups}`);
     console.log(`  3種類ステージ: ${stats.path3}`);
     console.log(`  4種類ステージ: ${stats.path4}`);
-    
+
     return {
         hasDuplicates: duplicates.length > 0,
         duplicates,
@@ -531,14 +531,14 @@ function verifyAllLevels() {
         console.log('❌ LEVELSが空です');
         return;
     }
-    
+
     console.log(`\n🔍 ${LEVELS.length}ステージの検証開始...`);
     console.time('検証時間');
-    
+
     let passCount = 0;
     let failCount = 0;
     const failedLevels = [];
-    
+
     LEVELS.forEach(level => {
         if (verifyLevel(level)) {
             passCount++;
@@ -546,21 +546,21 @@ function verifyAllLevels() {
             failCount++;
             failedLevels.push(level.id);
         }
-        
+
         if ((passCount + failCount) % 100 === 0) {
             console.log(`  検証中... ${passCount + failCount} / ${LEVELS.length}`);
         }
     });
-    
+
     console.timeEnd('検証時間');
-    
+
     if (failCount === 0) {
         console.log(`✅ 全${passCount}ステージがクリア可能です！`);
     } else {
         console.log(`⚠️ ${failCount}ステージに問題があります:`);
         console.log(`  問題のあるステージ: ${failedLevels.join(', ')}`);
     }
-    
+
     return {
         passed: passCount,
         failed: failCount,
@@ -568,14 +568,4 @@ function verifyAllLevels() {
     };
 }
 
-// グローバル公開
-window.LevelGenerator = LevelGenerator;
-window.generateTestLevels = generateTestLevels;
-window.verifyLevel = verifyLevel;
-window.verifyCurrentLevel = verifyCurrentLevel;
-window.checkDuplicates = checkDuplicates;
-window.verifyAllLevels = verifyAllLevels;
 
-console.log('✅ LevelGenerator v4 loaded');
-console.log('💡 checkDuplicates() で重複チェック');
-console.log('💡 verifyAllLevels() で全ステージ検証');

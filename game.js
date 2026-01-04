@@ -3,6 +3,9 @@
  * 温かみのある手描き風イラストデザイン
  */
 
+import Phaser from 'phaser';
+import { LevelGenerator } from './levelGenerator.js';
+
 const CONFIG = {
     GRID_SIZE: 6,
     CELL_PADDING: 6,
@@ -1767,7 +1770,9 @@ const gameConfig = {
     scene: [BootScene, TitleScene, SelectScene, GameScene, ClearScene, GameOverScene]
 };
 
-window.addEventListener('DOMContentLoaded', () => {
-    console.log('🐕 いぬさんぽ - ねこあつめ風スタイル');
-    window.game = new Phaser.Game(gameConfig);
-});
+// ゲーム開始
+console.log('🐕 いぬさんぽ - ねこあつめ風スタイル');
+const game = new Phaser.Game(gameConfig);
+
+// デバッグ用にグローバル公開（必要であれば）
+window.game = game;
