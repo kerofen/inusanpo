@@ -1,0 +1,17 @@
+# このディレクトリに画像・音声アセットを配置してください
+# 
+# 推奨構造:
+# assets/
+#   images/
+#     background.png
+#     dog.png
+#     paw.png
+#     snack_1.png
+#     snack_2.png
+#     snack_3.png
+#     snack_4.png
+#   audio/
+#     bgm.mp3
+#     sfx_connect.mp3
+#     sfx_clear.mp3
+
