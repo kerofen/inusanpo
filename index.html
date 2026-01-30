@@ -8,8 +8,17 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#FFF5F5">
-    <title>いぬさんぽ 🐕</title>
+    <title>ワンこねくと 🐕</title>
     <style>
+        /* けいフォント読み込み */
+        @font-face {
+            font-family: 'KeiFont';
+            src: url('/assets/k-font/keifont.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -21,8 +30,8 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: linear-gradient(135deg, #FFF5F5 0%, #FFE4E1 100%);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #87CEEB;
+            font-family: 'KeiFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
         #game-container {
@@ -40,69 +49,15 @@
                 0 20px 60px rgba(255, 182, 193, 0.4),
                 0 0 0 1px rgba(255, 255, 255, 0.8);
         }
-
-        /* ローディング画面のフォールバック */
-        .loading-fallback {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #FFF5F5 0%, #FFE4E1 100%);
-            z-index: 9999;
-            transition: opacity 0.3s;
-        }
-
-        .loading-fallback.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .loading-dog {
-            font-size: 80px;
-            animation: bounce 0.6s ease-in-out infinite alternate;
-        }
-
-        .loading-text {
-            margin-top: 20px;
-            font-size: 18px;
-            color: #888;
-        }
-
-        @keyframes bounce {
-            from {
-                transform: translateY(0);
-            }
-
-            to {
-                transform: translateY(-20px);
-            }
-        }
     </style>
 </head>
 
 <body>
-    <!-- ローディング画面 -->
-    <div class="loading-fallback" id="loading">
-        <div class="loading-dog">🐕</div>
-        <div class="loading-text">よみこみちゅう...</div>
-    </div>
-
     <!-- ゲームコンテナ -->
     <div id="game-container"></div>
 
     <!-- ゲーム本体（Viteエントリーポイント） -->
     <script type="module" src="/game.js"></script>
-
-    <script>
-        // ローディング画面を非表示
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                document.getElementById('loading').classList.add('hidden');
-            }, 500);
-        });
-    </script>
 </body>
 
 </html>

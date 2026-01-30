@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+      "ElevenLabs": {
+        "command": "C:\\Users\\janne\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "args": [
+          "-m",
+          "elevenlabs_mcp"
+        ],
+        "env": {
+          "ELEVENLABS_API_KEY": "sk_3c4369ebcfbc8ef5dec5285f28a5be7f7ce41591a31aca4f"
+        }
+      }
+    }
+  }

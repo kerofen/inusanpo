@@ -1,18 +1,22 @@
 {
   "name": "inusanpo",
   "version": "1.0.0",
-  "description": "いぬさんぽ - 一筆書きパズルゲーム",
+  "description": "ワンこねくと - 一筆書きパズルゲーム",
   "main": "main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh-pages": "vite build --mode gh-pages",
     "preview": "vite preview",
     "cap:add:android": "npx cap add android",
     "cap:add:ios": "npx cap add ios",
     "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
-    "deploy": "gh-pages -d dist"
+    "deploy": "npm run build:gh-pages && gh-pages -d dist",
+    "build:android": "npm run build && npx cap sync android && npx cap open android",
+    "build:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "release:prepare": "npm run build && npx cap sync"
   },
   "keywords": [
     "phaser",
@@ -24,6 +28,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@capacitor-community/admob": "^6.2.0",
+    "@capacitor/haptics": "^6.0.3",
+    "@capgo/native-purchases": "^8.0.18",
     "phaser": "^3.80.1",
     "sharp": "^0.34.5"
   },
@@ -34,6 +41,8 @@
     "@capacitor/ios": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
     "gh-pages": "^6.3.0",
+    "lamejs": "^1.2.1",
+    "typescript": "^5.9.3",
     "vite": "^5.4.0"
   }
 }

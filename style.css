@@ -65,6 +65,24 @@ body {
 }
 
 /* ========================================
+   Phaserゲーム用コンテナ
+   ======================================== */
+#game-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #87CEEB;
+}
+
+#game-container canvas {
+    /* タッチ操作の最適化 */
+    touch-action: none;
+    -webkit-touch-callout: none;
+}
+
+/* ========================================
    タイトル画面
    ======================================== */
 #title-screen {
@@ -552,6 +570,7 @@ body {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     border: 3px solid transparent;
+    position: relative;
 }
 
 .stage-card:hover {
@@ -565,6 +584,26 @@ body {
 
 .stage-card.selected {
     border-color: #FF69B4;
+}
+
+/* クリア済みステージ */
+.stage-card.cleared {
+    border-color: #FFD700;
+    background: linear-gradient(135deg, #FFFEF0 0%, #FFF8DC 100%);
+}
+
+.stage-card.cleared:hover {
+    box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3);
+}
+
+.clear-mark {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    color: #FFD700;
+    font-size: 24px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1;
 }
 
 .stage-number {

@@ -1,0 +1,442 @@
+{
+  "analysis": {
+    "bgm": [
+      {
+        "file": "bgm_challenge_illuminate.mp3",
+        "path": "assets\\audio\\bgm\\bgm_challenge_illuminate.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_challenge_illuminate.wav",
+        "path": "assets\\audio\\bgm\\bgm_challenge_illuminate.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      },
+      {
+        "file": "bgm_clear_tailwag.mp3",
+        "path": "assets\\audio\\bgm\\bgm_clear_tailwag.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_clear_tailwag.wav",
+        "path": "assets\\audio\\bgm\\bgm_clear_tailwag.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      },
+      {
+        "file": "bgm_game_honobono.mp3",
+        "path": "assets\\audio\\bgm\\bgm_game_honobono.mp3",
+        "dBFS": -18.46,
+        "duration_ms": 76011,
+        "success": true,
+        "recommended_volume": 0.4
+      },
+      {
+        "file": "bgm_gameover_waltz.mp3",
+        "path": "assets\\audio\\bgm\\bgm_gameover_waltz.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_gameover_waltz.wav",
+        "path": "assets\\audio\\bgm\\bgm_gameover_waltz.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      },
+      {
+        "file": "bgm_menu_puzzle_cooking.mp3",
+        "path": "assets\\audio\\bgm\\bgm_menu_puzzle_cooking.mp3",
+        "dBFS": -10.37,
+        "duration_ms": 123008,
+        "success": true,
+        "recommended_volume": 0.37
+      },
+      {
+        "file": "bgm_select_kirakira.mp3",
+        "path": "assets\\audio\\bgm\\bgm_select_kirakira.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_select_kirakira.wav",
+        "path": "assets\\audio\\bgm\\bgm_select_kirakira.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      },
+      {
+        "file": "bgm_story_weekdayafternoon.mp3",
+        "path": "assets\\audio\\bgm\\bgm_story_weekdayafternoon.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_story_weekdayafternoon.wav",
+        "path": "assets\\audio\\bgm\\bgm_story_weekdayafternoon.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      },
+      {
+        "file": "bgm_title_comicalnichijo.mp3",
+        "path": "assets\\audio\\bgm\\bgm_title_comicalnichijo.mp3",
+        "dBFS": -16.37,
+        "duration_ms": 81003,
+        "success": true,
+        "recommended_volume": 0.39
+      },
+      {
+        "file": "bgm_title_sanpobiyori.mp3",
+        "path": "assets\\audio\\bgm\\bgm_title_sanpobiyori.mp3",
+        "dBFS": -Infinity,
+        "duration_ms": 50,
+        "success": true,
+        "recommended_volume": 1.0
+      },
+      {
+        "file": "bgm_title_sanpobiyori.wav",
+        "path": "assets\\audio\\bgm\\bgm_title_sanpobiyori.wav",
+        "dBFS": -11.57,
+        "duration_ms": 12800,
+        "success": true,
+        "recommended_volume": 0.38
+      }
+    ],
+    "se": [
+      {
+        "file": "se_button_tap.mp3",
+        "path": "assets\\audio\\se\\se_button_tap.mp3",
+        "dBFS": -40.04,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.57
+      },
+      {
+        "file": "se_clear_v2_fuwakirun.mp3",
+        "path": "assets\\audio\\se\\se_clear_v2_fuwakirun.mp3",
+        "dBFS": -20.48,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.51
+      },
+      {
+        "file": "se_clear_v2_kirakira.mp3",
+        "path": "assets\\audio\\se\\se_clear_v2_kirakira.mp3",
+        "dBFS": -28.44,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.53
+      },
+      {
+        "file": "se_clear_v2_pikon.mp3",
+        "path": "assets\\audio\\se\\se_clear_v2_pikon.mp3",
+        "dBFS": -23.5,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.52
+      },
+      {
+        "file": "se_clear_v2_poyopiyo.mp3",
+        "path": "assets\\audio\\se\\se_clear_v2_poyopiyo.mp3",
+        "dBFS": -18.12,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.5
+      },
+      {
+        "file": "se_clear_v2_pyurun.mp3",
+        "path": "assets\\audio\\se\\se_clear_v2_pyurun.mp3",
+        "dBFS": -26.79,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.53
+      },
+      {
+        "file": "se_connect_pan.mp3",
+        "path": "assets\\audio\\se\\se_connect_pan.mp3",
+        "dBFS": -47.08,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.6
+      },
+      {
+        "file": "se_connect_pikon.mp3",
+        "path": "assets\\audio\\se\\se_connect_pikon.mp3",
+        "dBFS": -27.03,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.53
+      },
+      {
+        "file": "se_connect_poko.mp3",
+        "path": "assets\\audio\\se\\se_connect_poko.mp3",
+        "dBFS": -38.14,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.57
+      },
+      {
+        "file": "se_connect_pon.mp3",
+        "path": "assets\\audio\\se\\se_connect_pon.mp3",
+        "dBFS": -14.27,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.49
+      },
+      {
+        "file": "se_connect_pyu.mp3",
+        "path": "assets\\audio\\se\\se_connect_pyu.mp3",
+        "dBFS": -18.22,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.5
+      },
+      {
+        "file": "se_connect_v2_koron.mp3",
+        "path": "assets\\audio\\se\\se_connect_v2_koron.mp3",
+        "dBFS": -24.3,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.52
+      },
+      {
+        "file": "se_connect_v2_pirun.mp3",
+        "path": "assets\\audio\\se\\se_connect_v2_pirun.mp3",
+        "dBFS": -36.21,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.56
+      },
+      {
+        "file": "se_connect_v2_pokon.mp3",
+        "path": "assets\\audio\\se\\se_connect_v2_pokon.mp3",
+        "dBFS": -20.21,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.51
+      },
+      {
+        "file": "se_connect_v2_poyoyon.mp3",
+        "path": "assets\\audio\\se\\se_connect_v2_poyoyon.mp3",
+        "dBFS": -24.97,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.52
+      },
+      {
+        "file": "se_connect_v2_puyon.mp3",
+        "path": "assets\\audio\\se\\se_connect_v2_puyon.mp3",
+        "dBFS": -24.46,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.52
+      },
+      {
+        "file": "se_gameover_v2_funyaa.mp3",
+        "path": "assets\\audio\\se\\se_gameover_v2_funyaa.mp3",
+        "dBFS": -34.75,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.56
+      },
+      {
+        "file": "se_gameover_v2_koron.mp3",
+        "path": "assets\\audio\\se\\se_gameover_v2_koron.mp3",
+        "dBFS": -15.61,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.49
+      },
+      {
+        "file": "se_gameover_v2_poyon.mp3",
+        "path": "assets\\audio\\se\\se_gameover_v2_poyon.mp3",
+        "dBFS": -19.59,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.51
+      },
+      {
+        "file": "se_gameover_v2_puu.mp3",
+        "path": "assets\\audio\\se\\se_gameover_v2_puu.mp3",
+        "dBFS": -28.29,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.53
+      },
+      {
+        "file": "se_gameover_v2_shuun.mp3",
+        "path": "assets\\audio\\se\\se_gameover_v2_shuun.mp3",
+        "dBFS": -14.02,
+        "duration_ms": 1000,
+        "success": true,
+        "recommended_volume": 0.49
+      },
+      {
+        "file": "se_match_connect.mp3",
+        "path": "assets\\audio\\se\\se_match_connect.mp3",
+        "dBFS": -39.38,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.57
+      },
+      {
+        "file": "se_tile_trace.mp3",
+        "path": "assets\\audio\\se\\se_tile_trace.mp3",
+        "dBFS": -11.93,
+        "duration_ms": 480,
+        "success": true,
+        "recommended_volume": 0.48
+      },
+      {
+        "file": "シャキーン2.mp3",
+        "path": "assets\\audio\\se\\シャキーン2.mp3",
+        "dBFS": -18.4,
+        "duration_ms": 1232,
+        "success": true,
+        "recommended_volume": 0.5
+      }
+    ]
+  },
+  "recommended_settings": {
+    "bgm_title": {
+      "file": "bgm_title_comicalnichijo.mp3",
+      "dBFS": -16.37,
+      "category": "bgm",
+      "volume": 0.39
+    },
+    "bgm_select": {
+      "file": "bgm_menu_puzzle_cooking.mp3",
+      "dBFS": -10.37,
+      "category": "bgm",
+      "volume": 0.37
+    },
+    "bgm_story": {
+      "file": "bgm_game_honobono.mp3",
+      "dBFS": -18.46,
+      "category": "bgm",
+      "volume": 0.4
+    },
+    "bgm_challenge": {
+      "file": "bgm_game_honobono.mp3",
+      "dBFS": -18.46,
+      "category": "bgm",
+      "volume": 0.4
+    },
+    "bgm_clear": {
+      "file": "bgm_clear_tailwag.wav",
+      "dBFS": -11.57,
+      "category": "bgm",
+      "volume": 0.38
+    },
+    "bgm_gameover": {
+      "file": "bgm_gameover_waltz.wav",
+      "dBFS": -11.57,
+      "category": "bgm",
+      "volume": 0.38
+    },
+    "sfx_ui_tap": {
+      "file": "se_button_tap.mp3",
+      "dBFS": -40.04,
+      "category": "ui_se",
+      "volume": 0.42
+    },
+    "sfx_ui_toggle": {
+      "file": "se_button_tap.mp3",
+      "dBFS": -40.04,
+      "category": "ui_se",
+      "volume": 0.38
+    },
+    "sfx_draw_start": {
+      "file": "se_tile_trace.mp3",
+      "dBFS": -11.93,
+      "category": "gameplay_se",
+      "volume": 0.48
+    },
+    "sfx_draw_step": {
+      "file": "se_tile_trace.mp3",
+      "dBFS": -11.93,
+      "category": "gameplay_se",
+      "volume": 0.29
+    },
+    "sfx_connect": {
+      "file": "se_connect_v2_koron.mp3",
+      "dBFS": -24.3,
+      "category": "gameplay_se",
+      "volume": 0.52
+    },
+    "sfx_error": {
+      "file": "se_gameover_v2_puu.mp3",
+      "dBFS": -28.29,
+      "category": "gameplay_se",
+      "volume": 0.53
+    },
+    "sfx_reset": {
+      "file": "se_connect_v2_pokon.mp3",
+      "dBFS": -20.21,
+      "category": "gameplay_se",
+      "volume": 0.51
+    },
+    "sfx_hint": {
+      "file": "se_clear_v2_kirakira.mp3",
+      "dBFS": -28.44,
+      "category": "gameplay_se",
+      "volume": 0.53
+    },
+    "sfx_clear": {
+      "file": "se_clear_v2_pyurun.mp3",
+      "dBFS": -26.79,
+      "category": "result_se",
+      "volume": 0.63
+    },
+    "sfx_gameover": {
+      "file": "se_gameover_v2_koron.mp3",
+      "dBFS": -15.61,
+      "category": "result_se",
+      "volume": 0.59
+    },
+    "sfx_challenge_combo": {
+      "file": "se_connect_v2_poyoyon.mp3",
+      "dBFS": -24.97,
+      "category": "result_se",
+      "volume": 0.62
+    },
+    "sfx_achievement": {
+      "file": "se_clear_v2_pikon.mp3",
+      "dBFS": -23.5,
+      "category": "special_se",
+      "volume": 0.67
+    },
+    "sfx_unlock_item": {
+      "file": "シャキーン2.mp3",
+      "dBFS": -18.4,
+      "category": "special_se",
+      "volume": 0.65
+    },
+    "sfx_medal": {
+      "file": "se_clear_v2_pikon.mp3",
+      "dBFS": -23.5,
+      "category": "special_se",
+      "volume": 0.67
+    }
+  }
+}

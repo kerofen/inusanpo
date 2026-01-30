@@ -1,0 +1,25 @@
+{
+  "name": "pv-remotion",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render WanConnectPV out/wanconnect-pv.mp4",
+    "build:all": "npm run build && npm run generate-srt",
+    "generate-srt": "node scripts/generate-srt.js",
+    "preview": "remotion preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@remotion/cli": "^4.0.408",
+    "@remotion/renderer": "^4.0.408",
+    "@types/react": "^19.2.9",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "remotion": "^4.0.408",
+    "typescript": "^5.9.3"
+  }
+}

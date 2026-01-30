@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-    // ベースパス（Capacitor用）
-    base: './',
+export default defineConfig(({ command, mode }) => ({
+    // ベースパス（GitHub Pages用: /inusanpo/）
+    // build --mode gh-pages で GitHub Pages 向けビルド
+    base: mode === 'gh-pages' ? '/inusanpo/' : './',
+    
+    // 静的アセットフォルダ
+    publicDir: 'public',
 
     // 開発サーバー設定
     server: {
@@ -46,5 +50,5 @@ export default defineConfig({
         // 事前バンドルする依存関係
         include: ['phaser'],
     },
-});
+}));
 

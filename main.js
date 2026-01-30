@@ -11,6 +11,9 @@ const CONFIG = {
     SNACK_TYPES: 4,         // おやつの種類（最大4）
     CELL_PADDING: 6,        // セル間の隙間
     CORNER_RADIUS: 10,      // 角丸
+    PAW_COLOR: '#5D4037',   // 肉球のデフォルトカラー（こげちゃ）
+    PAW_HIGHLIGHT: '#795548', // 肉球のハイライト
+    PAW_SHADOW: '#3E2723',   // 肉球の影
 };
 
 // おやつの色とEmoji（最大4種類）
@@ -24,60 +27,94 @@ const SNACKS = {
 // レベルデータ（自動生成 or 手動定義）
 let LEVELS = [];
 
+// ========================================
+// クリア状態の保存・読込
+// ========================================
+
+/**
+ * クリア済みステージのIDリストを読み込む
+ */
+function loadClearedStages() {
+    try {
+        const saved = localStorage.getItem('inusanpo_cleared');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.error('クリア状態の読み込みに失敗:', e);
+        return [];
+    }
+}
+
+/**
+ * ステージをクリア済みとして保存
+ */
+function saveClearedStage(stageId) {
+    try {
+        const cleared = loadClearedStages();
+        if (!cleared.includes(stageId)) {
+            cleared.push(stageId);
+            localStorage.setItem('inusanpo_cleared', JSON.stringify(cleared));
+            console.log(`✅ ステージ ${stageId} クリア保存！`);
+        }
+    } catch (e) {
+        console.error('クリア状態の保存に失敗:', e);
+    }
+}
+
+/**
+ * ステージがクリア済みかどうかを確認
+ */
+function isStageClear(stageId) {
+    const cleared = loadClearedStages();
+    return cleared.includes(stageId);
+}
+
 // レベル生成器の初期化（500ステージ）
+// シード付き乱数で毎回同じステージが生成される
 function initializeLevels() {
     const TOTAL_STAGES = 500;
     
     if (typeof LevelGenerator !== 'undefined') {
-        console.log(`🎲 ${TOTAL_STAGES}ステージ生成開始...`);
+        console.log(`🎲 ${TOTAL_STAGES}ステージ生成開始（シード固定）...`);
         console.time('生成時間');
         
-        const generator = new LevelGenerator(6);
         LEVELS = [];
         
-        const usedPatterns = new Set();
-        let consecutiveFails = 0;
-        
-        while (LEVELS.length < TOTAL_STAGES) {
+        for (let stageNum = 1; stageNum <= TOTAL_STAGES; stageNum++) {
+            // ステージ番号をシードとして使用（同じ番号なら同じステージ）
+            const seed = stageNum * 12345; // シードをばらけさせる
+            const generator = new LevelGenerator(6, seed);
+            
             // 難易度設定
             let difficulty;
-            if (LEVELS.length < 100) difficulty = 1;
-            else if (LEVELS.length < 300) difficulty = 2;
+            if (stageNum <= 100) difficulty = 1;
+            else if (stageNum <= 300) difficulty = 2;
             else difficulty = 3;
             
             const level = generator.generate({
                 difficulty: difficulty,
-                maxAttempts: 100 // 増やした
+                maxAttempts: 100
             });
             
             if (level) {
-                const hash = level.snacks
-                    .map(s => `${s.row},${s.col},${s.type}`)
-                    .sort()
-                    .join('|');
+                level.id = stageNum;
+                level.name = `ステージ ${stageNum}`;
+                LEVELS.push(level);
                 
-                if (!usedPatterns.has(hash)) {
-                    usedPatterns.add(hash);
-                    level.id = LEVELS.length + 1;
-                    level.name = `ステージ ${level.id}`;
-                    LEVELS.push(level);
-                    consecutiveFails = 0;
-                    
-                    if (LEVELS.length % 100 === 0) {
-                        console.log(`✅ ${LEVELS.length} / ${TOTAL_STAGES}`);
-                    }
-                } else {
-                    consecutiveFails++;
+                if (stageNum % 100 === 0) {
+                    console.log(`✅ ${stageNum} / ${TOTAL_STAGES}`);
                 }
             } else {
-                consecutiveFails++;
-            }
-            
-            // 連続失敗が多すぎたら重複チェックを緩和
-            if (consecutiveFails > 50) {
-                console.log(`⚠️ 重複多発、チェック緩和 (${LEVELS.length})`);
-                usedPatterns.clear(); // リセット
-                consecutiveFails = 0;
+                // 失敗時は別シードで再試行
+                const retryGenerator = new LevelGenerator(6, seed + 99999);
+                const retryLevel = retryGenerator.generate({
+                    difficulty: difficulty,
+                    maxAttempts: 100
+                });
+                if (retryLevel) {
+                    retryLevel.id = stageNum;
+                    retryLevel.name = `ステージ ${stageNum}`;
+                    LEVELS.push(retryLevel);
+                }
             }
         }
         
@@ -432,20 +469,121 @@ class InuSanpoGame {
         if (!trail || trail.length === 0) return;
         
         const ctx = this.ctx;
-        const snack = SNACKS[type];
         
         trail.forEach((paw, index) => {
-            const alpha = 0.6 + (index / trail.length) * 0.4;
+            const alpha = 0.7 + (index / trail.length) * 0.3;
+            const size = this.cellSize * 0.28;
             ctx.save();
             ctx.translate(paw.x, paw.y);
             ctx.rotate(paw.angle);
-            ctx.font = `${this.cellSize * 0.35}px serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
             ctx.globalAlpha = alpha;
-            ctx.fillText('🐾', 0, 0);
+            this.drawPuniPuniPaw(ctx, 0, 0, size);
             ctx.restore();
         });
+    }
+    
+    // 黒くてぷにぷにしたかわいい肉球を描画
+    drawPuniPuniPaw(ctx, x, y, size) {
+        const pawColor = CONFIG.PAW_COLOR;
+        const highlight = CONFIG.PAW_HIGHLIGHT;
+        const shadow = CONFIG.PAW_SHADOW;
+        
+        // メインパッド（ハート型に近い形状）
+        const mainPadW = size * 1.0;
+        const mainPadH = size * 0.85;
+        
+        // メインパッドの位置（少し下寄り）
+        const mainY = y + size * 0.2;
+        
+        // メインパッド描画
+        ctx.beginPath();
+        this.drawPawPad(ctx, x, mainY, mainPadW, mainPadH);
+        
+        // グラデーションでぷにぷに感を出す
+        const mainGradient = ctx.createRadialGradient(
+            x - mainPadW * 0.2, mainY - mainPadH * 0.2, 0,
+            x, mainY, mainPadW * 0.7
+        );
+        mainGradient.addColorStop(0, highlight);
+        mainGradient.addColorStop(0.5, pawColor);
+        mainGradient.addColorStop(1, shadow);
+        ctx.fillStyle = mainGradient;
+        ctx.fill();
+        
+        // ハイライト（つやつや感）
+        ctx.beginPath();
+        ctx.ellipse(
+            x - mainPadW * 0.15, 
+            mainY - mainPadH * 0.2, 
+            mainPadW * 0.2, 
+            mainPadH * 0.15, 
+            -0.3, 0, Math.PI * 2
+        );
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fill();
+        
+        // 指の肉球（4つ）
+        const toePositions = [
+            { x: -size * 0.42, y: -size * 0.35, scale: 0.38 },
+            { x: -size * 0.15, y: -size * 0.52, scale: 0.35 },
+            { x: size * 0.15, y: -size * 0.52, scale: 0.35 },
+            { x: size * 0.42, y: -size * 0.35, scale: 0.38 },
+        ];
+        
+        toePositions.forEach(toe => {
+            const toeSize = size * toe.scale;
+            const toeX = x + toe.x;
+            const toeY = y + toe.y;
+            
+            // 指パッド
+            ctx.beginPath();
+            ctx.ellipse(toeX, toeY, toeSize * 0.5, toeSize * 0.55, 0, 0, Math.PI * 2);
+            
+            // 指パッドのグラデーション
+            const toeGradient = ctx.createRadialGradient(
+                toeX - toeSize * 0.15, toeY - toeSize * 0.15, 0,
+                toeX, toeY, toeSize * 0.5
+            );
+            toeGradient.addColorStop(0, highlight);
+            toeGradient.addColorStop(0.5, pawColor);
+            toeGradient.addColorStop(1, shadow);
+            ctx.fillStyle = toeGradient;
+            ctx.fill();
+            
+            // 指パッドのハイライト
+            ctx.beginPath();
+            ctx.ellipse(
+                toeX - toeSize * 0.1, 
+                toeY - toeSize * 0.12, 
+                toeSize * 0.15, 
+                toeSize * 0.1, 
+                -0.3, 0, Math.PI * 2
+            );
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fill();
+        });
+    }
+    
+    // 肉球パッドの形状（ハート型に近い楕円）
+    drawPawPad(ctx, x, y, w, h) {
+        // 上部を少しへこませたかわいい形状
+        ctx.moveTo(x, y - h * 0.5);
+        ctx.bezierCurveTo(
+            x + w * 0.6, y - h * 0.5,
+            x + w * 0.55, y + h * 0.1,
+            x + w * 0.45, y + h * 0.4
+        );
+        ctx.bezierCurveTo(
+            x + w * 0.3, y + h * 0.6,
+            x - w * 0.3, y + h * 0.6,
+            x - w * 0.45, y + h * 0.4
+        );
+        ctx.bezierCurveTo(
+            x - w * 0.55, y + h * 0.1,
+            x - w * 0.6, y - h * 0.5,
+            x, y - h * 0.5
+        );
+        ctx.closePath();
     }
     
     // ========================================
@@ -793,6 +931,14 @@ class InuSanpoGame {
         // クリア！
         console.log('🎉 クリア！');
         
+        // クリア状態を保存（チャレンジモード以外）
+        if (!this.isChallengeMode) {
+            const stageId = LEVELS[this.currentLevel]?.id;
+            if (stageId) {
+                saveClearedStage(stageId);
+            }
+        }
+        
         if (this.isChallengeMode) {
             setTimeout(() => this.showChallengeClearScreen(), 500);
         } else {
@@ -964,9 +1110,14 @@ class InuSanpoGame {
         const container = document.getElementById('stage-list');
         container.innerHTML = '';
         
+        // クリア済みステージを取得
+        const clearedStages = loadClearedStages();
+        
         LEVELS.forEach((level, index) => {
+            const isCleared = clearedStages.includes(level.id);
+            
             const card = document.createElement('div');
-            card.className = 'stage-card';
+            card.className = 'stage-card' + (isCleared ? ' cleared' : '');
             card.onclick = () => this.selectStage(index);
             
             // プレビューグリッド
@@ -980,7 +1131,11 @@ class InuSanpoGame {
             }
             previewHTML += '</div>';
             
+            // クリアマーク
+            const clearMark = isCleared ? '<div class="clear-mark">★</div>' : '';
+            
             card.innerHTML = `
+                ${clearMark}
                 <div class="stage-number">${level.id}</div>
                 <div class="stage-info">${level.pathCount}種類</div>
                 ${previewHTML}
@@ -988,6 +1143,9 @@ class InuSanpoGame {
             
             container.appendChild(card);
         });
+        
+        // クリア進捗を表示
+        console.log(`📊 クリア進捗: ${clearedStages.length} / ${LEVELS.length}`);
         
         // 検証情報も表示
         this.logLevelInfo();

@@ -15,10 +15,34 @@
  * 分割後も各セグメントは必ず連続している。
  */
 
+/**
+ * シード付き乱数生成器（Mulberry32アルゴリズム）
+ * 同じシードなら常に同じ乱数列を生成
+ */
+function createSeededRandom(seed) {
+    let state = seed;
+    return function() {
+        state |= 0;
+        state = state + 0x6D2B79F5 | 0;
+        let t = Math.imul(state ^ state >>> 15, 1 | state);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
 export class LevelGenerator {
-    constructor(gridSize = 6) {
+    constructor(gridSize = 6, seed = null) {
         this.gridSize = gridSize;
         this.totalCells = gridSize * gridSize;
+        // シードが指定されていれば固定乱数、なければMath.random
+        this.random = seed !== null ? createSeededRandom(seed) : Math.random;
+    }
+    
+    /**
+     * シードを設定して乱数生成器をリセット
+     */
+    setSeed(seed) {
+        this.random = createSeededRandom(seed);
     }
 
     /**
@@ -53,7 +77,7 @@ export class LevelGenerator {
         const fullPath = this.generateSnakePath();
 
         // Step 2: パスを3〜4本に分割
-        const numPaths = Math.random() < 0.5 ? 3 : 4;
+        const numPaths = this.random() < 0.5 ? 3 : 4;
         const segments = this.splitPathSafely(fullPath, numPaths);
 
         if (!segments) return null;
@@ -90,7 +114,7 @@ export class LevelGenerator {
         const path = [];
 
         // ランダムな開始パターンを選択
-        const pattern = Math.floor(Math.random() * 4);
+        const pattern = Math.floor(this.random() * 4);
 
         switch (pattern) {
             case 0: // 左上から、横方向蛇行
@@ -167,7 +191,7 @@ export class LevelGenerator {
         for (let i = 1; i < numSegments; i++) {
             // 基準位置 ± ランダムなオフセット
             const basePos = i * segmentSize;
-            const offset = Math.floor(Math.random() * (segmentSize / 2)) - Math.floor(segmentSize / 4);
+            const offset = Math.floor(this.random() * (segmentSize / 2)) - Math.floor(segmentSize / 4);
             let pos = basePos + offset;
 
             // 範囲制限
