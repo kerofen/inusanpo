@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
     android: {
         // Edge-to-Edge対応 (Android 15+)
         // システムバー領域まで描画エリアを拡張
-        backgroundColor: '#000000',
+        backgroundColor: '#87CEEB',
         
         // スプラッシュスクリーン設定
         // allowMixedContent: true, // 開発時のみ
@@ -32,7 +32,7 @@ const config: CapacitorConfig = {
     // iOS固有設定
     ios: {
         // ステータスバー背景色
-        backgroundColor: '#000000',
+        backgroundColor: '#87CEEB',
         
         // コンテンツがステータスバー下に表示されることを許可
         contentInset: 'automatic',
@@ -62,7 +62,7 @@ const config: CapacitorConfig = {
             launchShowDuration: 2000,
             
             // 背景色
-            backgroundColor: '#000000',
+            backgroundColor: '#87CEEB',
             
             // スピナー表示
             showSpinner: false,

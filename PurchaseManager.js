@@ -4,10 +4,11 @@
  * このモジュールは@capgo/native-purchasesを使用してアプリ内課金を管理します。
  * iOS (StoreKit 2) と Android (Google Play Billing) の両方に対応しています。
  * 
- * 【重要】本番リリース前に以下を設定してください：
- * 1. Google Play Console で商品を登録
- * 2. App Store Connect で商品を登録
- * 3. PRODUCT_IDS を実際の商品IDに変更
+ * 【商品構成】
+ * 1. プレミアムセット（deluxe）- 広告削除＋いろどりパックのセット
+ * 2. いろどりパック（customize）- 肉球カラー・きせかえ・テーマ全解放
+ * 3. こうこくけし（removeAds）- 広告削除
+ * 4. ワンコを迎える（singleDog）- 犬1匹解放（消費型）
  */
 
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
@@ -23,16 +24,21 @@ export const PurchaseManager = {
     // 購入済み商品の状態
     purchaseState: {
         removeAds: false,      // 広告削除
-        premiumDogs: false,    // プレミアム犬種パック
+        customize: false,      // いろどりパック（全カスタマイズ解放）
+        deluxe: false,         // プレミアムセット購入済み
     },
     
     // 商品ID定義
-    // 【重要】Google Play Console / App Store Connect で登録した商品IDに変更してください
+    // Google Play Console / App Store Connect で登録する商品ID
     PRODUCT_IDS: {
+        // プレミアムセット（非消費型）- 広告削除＋いろどりパック
+        DELUXE: 'com.kerofen.inusanpo.deluxe',
+        // いろどりパック（非消費型）- 全カスタマイズ解放
+        CUSTOMIZE: 'com.kerofen.inusanpo.customize',
         // 広告削除（非消費型）
         REMOVE_ADS: 'com.kerofen.inusanpo.remove_ads',
-        // プレミアム犬種パック（非消費型）
-        PREMIUM_DOGS: 'com.kerofen.inusanpo.premium_dogs',
+        // ワンコを迎える（消費型）- 犬1匹解放
+        SINGLE_DOG: 'com.kerofen.inusanpo.single_dog',
     },
     
     // 商品情報キャッシュ
@@ -90,17 +96,36 @@ export const PurchaseManager = {
         }
         
         try {
-            // 非消費型（一度購入したら永続）商品を取得
-            const { products } = await NativePurchases.getProducts({
+            // 非消費型商品を取得
+            const { products: inappProducts } = await NativePurchases.getProducts({
                 productIdentifiers: [
+                    this.PRODUCT_IDS.DELUXE,
+                    this.PRODUCT_IDS.CUSTOMIZE,
                     this.PRODUCT_IDS.REMOVE_ADS,
-                    this.PRODUCT_IDS.PREMIUM_DOGS,
                 ],
-                productType: PURCHASE_TYPE.INAPP, // 非消費型
+                productType: PURCHASE_TYPE.INAPP,
             });
             
-            this.products = products || [];
+            // 消費型商品を取得（ワンコを迎える）
+            const { products: consumableProducts } = await NativePurchases.getProducts({
+                productIdentifiers: [
+                    this.PRODUCT_IDS.SINGLE_DOG,
+                ],
+                productType: PURCHASE_TYPE.INAPP, // 消費型もINAPPで取得
+            });
+            
+            this.products = [...(inappProducts || []), ...(consumableProducts || [])];
             console.log('[PurchaseManager] 商品情報取得:', this.products);
+            console.log('[PurchaseManager] 取得した商品数:', this.products.length);
+            if (this.products.length === 0) {
+                console.warn('[PurchaseManager] ⚠️ 商品が0件です。App Store Connectで商品が正しく設定されているか確認してください。');
+                console.warn('[PurchaseManager] 期待される商品ID:', [
+                    this.PRODUCT_IDS.DELUXE,
+                    this.PRODUCT_IDS.CUSTOMIZE,
+                    this.PRODUCT_IDS.REMOVE_ADS,
+                    this.PRODUCT_IDS.SINGLE_DOG,
+                ]);
+            }
             
             return this.products;
             
@@ -120,23 +145,102 @@ export const PurchaseManager = {
     },
     
     /**
-     * 広告削除商品を購入
+     * プレミアムセットを購入
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async purchaseDeluxe() {
+        const result = await this.purchaseProduct(this.PRODUCT_IDS.DELUXE, 'deluxe');
+        if (result.success) {
+            // プレミアムセットは広告削除＋いろどりパック両方を解放
+            this.purchaseState.removeAds = true;
+            this.purchaseState.customize = true;
+            this.savePurchaseState();
+            this.onRemoveAdsPurchased();
+            this.onCustomizePurchased();
+        }
+        return result;
+    },
+    
+    /**
+     * いろどりパックを購入
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async purchaseCustomize() {
+        const result = await this.purchaseProduct(this.PRODUCT_IDS.CUSTOMIZE, 'customize');
+        if (result.success) {
+            this.onCustomizePurchased();
+        }
+        return result;
+    },
+    
+    /**
+     * 広告削除を購入
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async purchaseRemoveAds() {
-        return await this.purchaseProduct(this.PRODUCT_IDS.REMOVE_ADS, 'removeAds');
+        const result = await this.purchaseProduct(this.PRODUCT_IDS.REMOVE_ADS, 'removeAds');
+        if (result.success) {
+            this.onRemoveAdsPurchased();
+        }
+        return result;
     },
     
     /**
-     * プレミアム犬種パックを購入
+     * ワンコを迎える（消費型）
      * @returns {Promise<{success: boolean, error?: string}>}
      */
-    async purchasePremiumDogs() {
-        return await this.purchaseProduct(this.PRODUCT_IDS.PREMIUM_DOGS, 'premiumDogs');
+    async purchaseSingleDog() {
+        if (Capacitor.getPlatform() === 'web') {
+            return { success: false, error: 'Web環境では購入できません' };
+        }
+        
+        if (!this.billingSupported) {
+            return { success: false, error: 'この端末では課金がサポートされていません' };
+        }
+        
+        try {
+            console.log(`[PurchaseManager] 購入開始: ${this.PRODUCT_IDS.SINGLE_DOG}`);
+            
+            const result = await NativePurchases.purchaseProduct({
+                productIdentifier: this.PRODUCT_IDS.SINGLE_DOG,
+                productType: PURCHASE_TYPE.INAPP,
+                quantity: 1,
+            });
+            
+            console.log('[PurchaseManager] 購入結果:', result);
+            
+            // @capgo/native-purchases は Transaction を直接返す（result.transaction ではなく result.transactionId 等）
+            if (result && (result.transactionId || result.transaction || result.productIdentifier)) {
+                // 消費型なので状態は保存しない（購入ごとに犬を選ぶ）
+                // ゲーム側でどの犬を解放するか選択させる
+                window.dispatchEvent(new CustomEvent('singleDogPurchased'));
+                return { success: true };
+            }
+            
+            return { success: false, error: '購入がキャンセルされました' };
+            
+        } catch (error) {
+            console.error('[PurchaseManager] 購入エラー:', error);
+            console.error('[PurchaseManager] エラー詳細:', JSON.stringify(error, null, 2));
+            
+            if (error.code === 'PURCHASE_CANCELLED' || 
+                error.message?.includes('cancel') ||
+                error.message?.includes('Cancel') ||
+                error.message?.includes('User cancelled')) {
+                return { success: false, error: '購入がキャンセルされました' };
+            }
+            
+            // 商品が見つからない場合
+            if (error.message?.includes('Cannot find product')) {
+                return { success: false, error: '商品が見つかりません。App Store Connectで商品が正しく設定されているか確認してください。' };
+            }
+            
+            return { success: false, error: error.message || '購入処理中にエラーが発生しました' };
+        }
     },
     
     /**
-     * 商品を購入
+     * 商品を購入（非消費型）
      * @param {string} productId 商品ID
      * @param {string} stateKey purchaseStateのキー
      * @returns {Promise<{success: boolean, error?: string}>}
@@ -162,15 +266,10 @@ export const PurchaseManager = {
             console.log('[PurchaseManager] 購入結果:', result);
             
             // 購入成功時の処理
-            if (result && result.transaction) {
+            // @capgo/native-purchases は Transaction を直接返す（result.transaction ではなく result.transactionId 等）
+            if (result && (result.transactionId || result.transaction || result.productIdentifier)) {
                 this.purchaseState[stateKey] = true;
                 this.savePurchaseState();
-                
-                // 広告削除の場合、AdManagerにも通知
-                if (stateKey === 'removeAds') {
-                    this.onRemoveAdsPurchased();
-                }
-                
                 return { success: true };
             }
             
@@ -178,12 +277,19 @@ export const PurchaseManager = {
             
         } catch (error) {
             console.error('[PurchaseManager] 購入エラー:', error);
+            console.error('[PurchaseManager] エラー詳細:', JSON.stringify(error, null, 2));
             
             // ユーザーキャンセルの場合
             if (error.code === 'PURCHASE_CANCELLED' || 
                 error.message?.includes('cancel') ||
-                error.message?.includes('Cancel')) {
+                error.message?.includes('Cancel') ||
+                error.message?.includes('User cancelled')) {
                 return { success: false, error: '購入がキャンセルされました' };
+            }
+            
+            // 商品が見つからない場合
+            if (error.message?.includes('Cannot find product')) {
+                return { success: false, error: '商品が見つかりません。App Store Connectで商品が正しく設定されているか確認してください。' };
             }
             
             return { success: false, error: error.message || '購入処理中にエラーが発生しました' };
@@ -191,7 +297,49 @@ export const PurchaseManager = {
     },
     
     /**
+     * 購入履歴からトランザクションを処理する共通メソッド
+     * @param {Array} purchases トランザクション配列
+     * @returns {string[]} 復元された商品名の配列
+     */
+    _processPurchases(purchases) {
+        const restored = [];
+        
+        for (const transaction of purchases) {
+            const productId = transaction.productIdentifier;
+            
+            if (productId === this.PRODUCT_IDS.DELUXE) {
+                this.purchaseState.deluxe = true;
+                this.purchaseState.removeAds = true;
+                this.purchaseState.customize = true;
+                restored.push('プレミアムセット');
+                this.onRemoveAdsPurchased();
+                this.onCustomizePurchased();
+            }
+            
+            if (productId === this.PRODUCT_IDS.CUSTOMIZE) {
+                this.purchaseState.customize = true;
+                restored.push('いろどりパック');
+                this.onCustomizePurchased();
+            }
+            
+            if (productId === this.PRODUCT_IDS.REMOVE_ADS) {
+                this.purchaseState.removeAds = true;
+                restored.push('広告削除');
+                this.onRemoveAdsPurchased();
+            }
+        }
+        
+        if (restored.length > 0) {
+            this.savePurchaseState();
+        }
+        
+        return restored;
+    },
+    
+    /**
      * 購入を復元
+     * restorePurchases() でストア側キャッシュを更新し、
+     * getPurchases() で購入履歴を取得して反映する
      * @returns {Promise<{success: boolean, restored: string[], error?: string}>}
      */
     async restorePurchases() {
@@ -206,29 +354,16 @@ export const PurchaseManager = {
         try {
             console.log('[PurchaseManager] 購入復元開始');
             
-            const result = await NativePurchases.restorePurchases();
-            console.log('[PurchaseManager] 復元結果:', result);
+            // ストア側のキャッシュを更新
+            await NativePurchases.restorePurchases();
             
-            const restored = [];
+            // 購入履歴を取得
+            const { purchases } = await NativePurchases.getPurchases({
+                productType: PURCHASE_TYPE.INAPP,
+            });
+            console.log('[PurchaseManager] 購入履歴:', purchases);
             
-            if (result && result.transactions) {
-                for (const transaction of result.transactions) {
-                    const productId = transaction.productIdentifier;
-                    
-                    if (productId === this.PRODUCT_IDS.REMOVE_ADS) {
-                        this.purchaseState.removeAds = true;
-                        restored.push('広告削除');
-                        this.onRemoveAdsPurchased();
-                    }
-                    
-                    if (productId === this.PRODUCT_IDS.PREMIUM_DOGS) {
-                        this.purchaseState.premiumDogs = true;
-                        restored.push('プレミアム犬種パック');
-                    }
-                }
-                
-                this.savePurchaseState();
-            }
+            const restored = this._processPurchases(purchases || []);
             
             if (restored.length > 0) {
                 console.log('[PurchaseManager] 復元完了:', restored);
@@ -248,26 +383,14 @@ export const PurchaseManager = {
      */
     async restorePurchasesSilent() {
         try {
-            const result = await NativePurchases.restorePurchases();
+            await NativePurchases.restorePurchases();
             
-            if (result && result.transactions) {
-                for (const transaction of result.transactions) {
-                    const productId = transaction.productIdentifier;
-                    
-                    if (productId === this.PRODUCT_IDS.REMOVE_ADS) {
-                        this.purchaseState.removeAds = true;
-                        this.onRemoveAdsPurchased();
-                    }
-                    
-                    if (productId === this.PRODUCT_IDS.PREMIUM_DOGS) {
-                        this.purchaseState.premiumDogs = true;
-                    }
-                }
-                
-                this.savePurchaseState();
-            }
+            const { purchases } = await NativePurchases.getPurchases({
+                productType: PURCHASE_TYPE.INAPP,
+            });
+            
+            this._processPurchases(purchases || []);
         } catch (error) {
-            // サイレント復元なのでエラーは無視
             console.log('[PurchaseManager] サイレント復元スキップ:', error.message);
         }
     },
@@ -276,15 +399,25 @@ export const PurchaseManager = {
      * 広告削除購入時のコールバック
      */
     onRemoveAdsPurchased() {
-        // AdManagerの広告削除フラグを設定
         try {
-            // 動的インポートを避けるため、グローバルイベントを発火
+            // グローバルイベントを発火
             window.dispatchEvent(new CustomEvent('adsRemoved'));
-            
             // LocalStorageにも保存（AdManager用）
             localStorage.setItem('inusanpo_ads_removed', 'true');
         } catch (error) {
             console.error('[PurchaseManager] 広告削除通知エラー:', error);
+        }
+    },
+    
+    /**
+     * いろどりパック購入時のコールバック
+     */
+    onCustomizePurchased() {
+        try {
+            // グローバルイベントを発火（ゲーム側で全カスタマイズを解放）
+            window.dispatchEvent(new CustomEvent('customizeUnlocked'));
+        } catch (error) {
+            console.error('[PurchaseManager] カスタマイズ解放通知エラー:', error);
         }
     },
     
@@ -323,11 +456,27 @@ export const PurchaseManager = {
     },
     
     /**
-     * プレミアム犬種パックを持っているか確認
+     * いろどりパックを持っているか確認
+     * @returns {boolean}
+     */
+    hasCustomize() {
+        return this.purchaseState.customize;
+    },
+    
+    /**
+     * プレミアムセットを持っているか確認
+     * @returns {boolean}
+     */
+    hasDeluxe() {
+        return this.purchaseState.deluxe;
+    },
+    
+    /**
+     * プレミアム犬種パックを持っているか確認（いろどりパックまたはプレミアムセット）
      * @returns {boolean}
      */
     hasPremiumDogs() {
-        return this.purchaseState.premiumDogs;
+        return this.purchaseState.customize || this.purchaseState.deluxe;
     },
     
     /**
@@ -350,20 +499,38 @@ export const PurchaseManager = {
     getShopItems() {
         return [
             {
+                id: this.PRODUCT_IDS.DELUXE,
+                name: 'プレミアムセット',
+                description: '広告けし＋いろどりパック まとめておとく！',
+                price: this.getFormattedPrice(this.PRODUCT_IDS.DELUXE),
+                purchased: this.purchaseState.deluxe,
+                icon: 'pack_premium',
+                isHero: true,
+            },
+            {
+                id: this.PRODUCT_IDS.CUSTOMIZE,
+                name: 'いろどりパック',
+                description: '肉球カラーやきせかえ、テーマをぜんぶ解放！',
+                price: this.getFormattedPrice(this.PRODUCT_IDS.CUSTOMIZE),
+                purchased: this.purchaseState.customize,
+                icon: 'pack_customize',
+            },
+            {
                 id: this.PRODUCT_IDS.REMOVE_ADS,
-                name: '広告削除',
-                description: 'すべての広告を永久に削除します',
+                name: 'こうこくけし',
+                description: 'すべての広告を削除します',
                 price: this.getFormattedPrice(this.PRODUCT_IDS.REMOVE_ADS),
                 purchased: this.purchaseState.removeAds,
                 icon: 'pack_noads',
             },
             {
-                id: this.PRODUCT_IDS.PREMIUM_DOGS,
-                name: 'プレミアム犬種パック',
-                description: '特別な犬種をすべて解放します',
-                price: this.getFormattedPrice(this.PRODUCT_IDS.PREMIUM_DOGS),
-                purchased: this.purchaseState.premiumDogs,
+                id: this.PRODUCT_IDS.SINGLE_DOG,
+                name: 'ワンコを迎える',
+                description: 'すきなワンコを１匹えらべる！',
+                price: this.getFormattedPrice(this.PRODUCT_IDS.SINGLE_DOG),
+                purchased: false, // 消費型なので常にfalse
                 icon: 'pack_dog',
+                isConsumable: true,
             },
         ];
     },

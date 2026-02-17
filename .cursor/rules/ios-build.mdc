@@ -1,0 +1,51 @@
+# 実機テスト用ビルドルール
+
+## 必須コマンド
+
+コードを変更したら、**必ず以下のコマンドを実行**してからIDEでビルドすること：
+
+### iOS
+
+```bash
+npm run build && npx cap sync ios
+```
+
+### Android
+
+```bash
+npm run build && npx cap sync android
+```
+
+### 両方同時
+
+```bash
+npm run build && npx cap sync
+```
+
+## なぜ必要か
+
+- `npm run build` → ソースコード（game.js等）を`dist`フォルダにビルド
+- `npx cap sync` → `dist`フォルダをネイティブプロジェクトにコピー
+
+**`npx cap sync`だけでは不十分**。ビルドしないと変更が反映されない。
+
+## チェックリスト
+
+### iOS
+1. コード変更
+2. `npm run build && npx cap sync ios` 実行
+3. Xcodeでビルド（必要に応じてClean Build）
+4. 実機にインストール
+5. 動作確認
+
+### Android
+1. コード変更
+2. `npm run build && npx cap sync android` 実行
+3. Android Studioでビルド（必要に応じてClean Project）
+4. 実機にインストール
+5. 動作確認
+
+## 注意
+
+- Lintエラーがあるとビルドが失敗する可能性あり
+- ビルド成功を確認してからIDE（Xcode/Android Studio）へ

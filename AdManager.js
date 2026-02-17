@@ -2,11 +2,6 @@
  * AdManager.js - AdMob広告管理モジュール
  * 
  * このモジュールはGoogle AdMobのインタースティシャル広告を管理します。
- * 
- * 【重要】本番リリース前に以下を変更してください：
- * 1. PRODUCTION_AD_IDS に実際の広告ユニットIDを設定
- * 2. initialize() の isTesting を false に変更
- * 3. AndroidManifest.xml と Info.plist のAdMob App IDを本番IDに変更
  */
 
 import { AdMob, AdmobConsentStatus, InterstitialAdPluginEvents } from '@capacitor-community/admob';
@@ -26,7 +21,7 @@ export const AdManager = {
     clearCount: 0,
     
     // 広告表示間隔（何ステージごとに広告を表示するか）
-    AD_INTERVAL: 5,
+    AD_INTERVAL: 3,
     
     // テスト用広告ユニットID（Google公式テストID）
     TEST_AD_IDS: {
@@ -38,13 +33,13 @@ export const AdManager = {
         }
     },
     
-    // 本番用広告ユニットID（リリース前に設定してください）
+    // 本番用広告ユニットID
     PRODUCTION_AD_IDS: {
         android: {
-            interstitial: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY' // TODO: 本番ID
+            interstitial: 'ca-app-pub-3040113142694955/8235479861'
         },
         ios: {
-            interstitial: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY' // TODO: 本番ID
+            interstitial: 'ca-app-pub-3040113142694955/8701559311'
         }
     },
     
@@ -76,9 +71,8 @@ export const AdManager = {
             
             // AdMob初期化
             await AdMob.initialize({
-                // テストモード（本番リリース前にfalseに変更）
                 testingDevices: [],
-                initializeForTesting: true
+                initializeForTesting: false
             });
             
             // イベントリスナーを設定
@@ -142,13 +136,8 @@ export const AdManager = {
      */
     getInterstitialId() {
         const platform = Capacitor.getPlatform();
-        // テストモード時はテストIDを使用（本番リリース前に変更）
-        const useTesting = true; // TODO: 本番リリース時にfalseに変更
-        
-        if (useTesting) {
-            return this.TEST_AD_IDS[platform]?.interstitial || '';
-        }
-        return this.PRODUCTION_AD_IDS[platform]?.interstitial || '';
+        const adIds = this.PRODUCTION_AD_IDS;
+        return adIds[platform]?.interstitial || '';
     },
     
     /**
@@ -172,7 +161,7 @@ export const AdManager = {
             
             await AdMob.prepareInterstitial({
                 adId: adId,
-                isTesting: true // TODO: 本番リリース時にfalseに変更
+                isTesting: false
             });
             
             console.log('[AdManager] インタースティシャル広告を準備中...');
@@ -218,11 +207,11 @@ export const AdManager = {
     },
     
     /**
-     * ステージクリア時に呼び出す
+     * ステージ終了時に呼び出す（クリア・失敗どちらでも）
      * AD_INTERVAL ステージごとに広告を表示
      * @returns {Promise<boolean>} 広告が表示されたかどうか
      */
-    async onStageClear() {
+    async onStageEnd() {
         if (this.isAdRemoved) {
             return false;
         }

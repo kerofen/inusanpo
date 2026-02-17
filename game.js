@@ -8,6 +8,7 @@ import { LevelGenerator } from './levelGenerator.js';
 import { HapticManager } from './HapticManager.js';
 import { AdManager } from './AdManager.js';
 import { PurchaseManager } from './PurchaseManager.js';
+import { Browser } from '@capacitor/browser';
 
 // AudioContext警告・エラーを抑制（ユーザー操作後に正常に開始されるため無害）
 // 音声ファイルのデコードエラーも抑制（SEを作り直すため）
@@ -46,7 +47,7 @@ if (typeof window !== 'undefined' && window.console) {
 //   - 全ワンコ・ずかん・きせかえ・テーマをアンロック
 //   - チュートリアルをスキップ
 // false: 通常のアンロック条件とチュートリアルを適用
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 // 下位互換性のためのエイリアス
 const TEST_MODE_UNLOCK_ALL = TEST_MODE;
@@ -82,9 +83,9 @@ class AudioManager {
         sfx_ui_toggle: { path: './assets/audio/se/se_button_tap.mp3', volume: 0.85 },   // -40.04 dBFS (toggleも上げる)
         
         // 🎮 ゲームプレイSE - 基準音量0.55
-        sfx_draw_start: { path: './assets/audio/se/se_tile_trace.mp3', volume: 0.39 },  // -11.93 dBFS (大きい→下げる)
-        sfx_draw_step: { path: './assets/audio/se/se_tile_trace.mp3', volume: 0.22 },   // -11.93 dBFS (繰り返し→さらに抑える)
-        sfx_connect: { path: './assets/audio/se/se_connect_v2_koron.mp3', volume: 0.90 },   // -24.30 dBFS (小さい→さらに上げる)
+        sfx_draw_start: { path: './assets/audio/se/se_tile_trace.mp3', volume: 0.59 },  // -11.93 dBFS (1.5倍に調整)
+        sfx_draw_step: { path: './assets/audio/se/se_tile_trace.mp3', volume: 0.33 },   // -11.93 dBFS (1.5倍に調整)
+        sfx_connect: { path: './assets/audio/se/se_connect_v2_koron.mp3', volume: 1.35 },   // -24.30 dBFS (1.5倍に調整)
         sfx_reset: { path: './assets/audio/se/se_connect_v2_pokon.mp3', volume: 0.62 },     // -20.21 dBFS
         sfx_hint: { path: './assets/audio/se/se_clear_v2_kirakira.mp3', volume: 0.85 },     // -28.44 dBFS (小さい→上げる)
         
@@ -95,7 +96,7 @@ class AudioManager {
         
         // ✨ 特別SE - 基準音量0.70 (達成感を演出)
         sfx_achievement: { path: './assets/audio/se/se_clear_v2_pikon.mp3', volume: 0.90 },     // -23.50 dBFS (小さい→上げる)
-        sfx_unlock_item: { path: './assets/audio/se/シャキーン2.mp3', volume: 0.71 },            // -18.40 dBFS (基準に近い)
+        sfx_unlock_item: { path: './assets/audio/se/シャキーン2.mp3', volume: 0.35 },            // -18.40 dBFS (半分に調整)
         sfx_medal: { path: './assets/audio/se/se_clear_v2_pikon.mp3', volume: 0.90 },           // -23.50 dBFS (小さい→上げる)
     };
 
@@ -140,60 +141,95 @@ class AudioManager {
         const contextState = soundSystem.context?.state;
         const needsUnlock = soundSystem.locked || contextState === 'suspended';
 
+        // 🔊 デバッグ: AudioContextの状態をログ出力
+        console.log('🔊 AudioManager.ensureUnlocked:', {
+            contextState,
+            soundLocked: soundSystem.locked,
+            needsUnlock,
+            unlocked: this.unlocked,
+            listenerAttached: this.unlockListenerAttached
+        });
+
         if (!needsUnlock && this.unlocked) return;
         if (this.unlockListenerAttached) return;
 
+        const self = this;
+        
         const removeGlobalListeners = () => {
             if (typeof window === 'undefined') return;
-            this.globalUnlockEvents.forEach(evt => {
+            self.globalUnlockEvents.forEach(evt => {
                 window.removeEventListener(evt, tryUnlock, true);
             });
         };
 
-        const tryUnlock = (event) => {
-            this.unlockListenerAttached = false;
+        // 🔧 修正: 非同期関数に変更してresume()の完了を待つ
+        const tryUnlock = async (event) => {
+            console.log('🔊 tryUnlock called:', event?.type);
+            self.unlockListenerAttached = false;
+            removeGlobalListeners();
+            
             const snd = scene.sound;
             if (!snd) return;
+
+            console.log('🔊 Current context state:', snd.context?.state, 'locked:', snd.locked);
 
             // ユーザー操作が確実に発生していることを確認
             // eventが存在する場合のみAudioContextをresume
             if (snd.context?.state === 'suspended') {
+                console.log('🔊 Attempting to resume AudioContext...');
                 try {
                     // ユーザー操作イベント内でresumeを呼ぶことで警告を回避
                     if (event && event.type) {
-                        snd.context.resume().catch(err => {
-                            // 警告を抑制（既にユーザー操作が発生しているため）
-                            console.debug('AudioContext resume failed', err);
-                        });
+                        await snd.context.resume();
+                        console.log('🔊 AudioContext resumed successfully! State:', snd.context?.state);
                     }
                 } catch (err) {
-                    console.debug('AudioContext resume failed', err);
+                    console.log('🔊 AudioContext resume failed:', err);
                 }
             }
+            
+            // PhaserのSound Managerのロック解除
+            // 🔧 修正: 複数回試行してロック解除を確実に行う
             if (snd.locked) {
                 try {
+                    // Phaserのunlockを呼ぶ
                     snd.unlock();
+                    
+                    // ロック解除を待つ（最大500ms）
+                    for (let i = 0; i < 10; i++) {
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                        if (!snd.locked) {
+                            console.log('🔊 Sound unlocked after', (i + 1) * 50, 'ms');
+                            break;
+                        }
+                    }
                 } catch (err) {
                     console.debug('Sound unlock failed', err);
                 }
             }
 
-            const isRunning = snd.context?.state === 'running' && !snd.locked;
+            // 🔧 修正: AudioContextがrunningならlockedに関係なく再生を試みる
+            const contextRunning = snd.context?.state === 'running';
+            const isRunning = contextRunning && !snd.locked;
+            console.log('🔊 After unlock attempt - context state:', snd.context?.state, 'locked:', snd.locked, 'isRunning:', isRunning);
 
-            if (!isRunning) {
-                removeGlobalListeners();
-                this.ensureUnlocked(scene);
-                return;
-            }
-
-            if (isRunning) {
-                this.unlocked = true;
-                removeGlobalListeners();
-                if (this.pendingBgm) {
-                    const pending = this.pendingBgm;
-                    this.pendingBgm = null;
-                    this.playBgm(pending.scene, pending.key, pending.config);
+            // AudioContextがrunningなら、lockedでも再生を試みる（iOS対策）
+            if (contextRunning) {
+                console.log('🔊 AudioContext is running! Unlocking AudioManager...');
+                self.unlocked = true;
+                if (self.pendingBgm) {
+                    console.log('🔊 Playing pending BGM:', self.pendingBgm.key);
+                    const pending = self.pendingBgm;
+                    self.pendingBgm = null;
+                    // 少し遅延してから再生（iOS対策）
+                    setTimeout(() => {
+                        self.playBgm(pending.scene, pending.key, pending.config);
+                    }, 100);
                 }
+            } else {
+                console.log('🔊 AudioContext still not running, will retry on next interaction');
+                // 次のインタラクションで再試行
+                self.ensureUnlocked(scene);
             }
         };
 
@@ -230,10 +266,19 @@ class AudioManager {
 
         const soundSystem = scene.sound;
         const contextState = soundSystem.context?.state;
-        if (!this.unlocked || soundSystem.locked || contextState === 'suspended') {
+        
+        // 🔧 修正: AudioContextがsuspendedの場合のみペンディング
+        // lockedでもcontextがrunningなら再生を試みる（iOS対策）
+        if (contextState === 'suspended') {
             this.pendingBgm = { scene, key, config };
             this.ensureUnlocked(scene);
             return;
+        }
+        
+        // AudioManagerがまだunlockedでない場合も、contextがrunningなら再生を試みる
+        if (!this.unlocked && contextState === 'running') {
+            this.unlocked = true;
+            console.log('🔊 AudioManager auto-unlocked because context is running');
         }
 
         if (this.currentBgmKey === key && !config.forceRestart) return;
@@ -287,10 +332,17 @@ class AudioManager {
     }
 
     static playSfx(scene, key, config = {}) {
-        if (scene?.sound?.locked) {
-            scene.sound.once(Phaser.Sound.Events.UNLOCKED, () => this.playSfx(scene, key, config));
+        const soundSystem = scene?.sound;
+        if (!soundSystem) return;
+        
+        // 🔧 修正: AudioContextがsuspendedの場合のみ待機
+        // lockedでもcontextがrunningなら再生を試みる（iOS対策）
+        const contextState = soundSystem.context?.state;
+        if (contextState === 'suspended') {
+            soundSystem.once(Phaser.Sound.Events.UNLOCKED, () => this.playSfx(scene, key, config));
             return;
         }
+        
         if (!this.seEnabled) return;
         const meta = this.AUDIO_MAP[key];
         if (!meta) return;
@@ -308,7 +360,7 @@ class AudioManager {
             }
             
             const baseVol = meta.volume ?? 0.6;
-            scene.sound.play(key, {
+            soundSystem.play(key, {
                 volume: baseVol * this.seVolume,  // 音量設定を適用
                 ...config
             });
@@ -345,6 +397,48 @@ class AudioManager {
     // 🔊 SE音量を設定（0.0 〜 1.0）
     static setSeVolume(volume) {
         this.seVolume = Math.max(0, Math.min(1, volume));
+    }
+
+    // 🔧 ユーザージェスチャー時に確実にAudioContextをアンロックする
+    // Safariなどの厳しいブラウザ対策
+    static async unlockFromUserGesture(scene) {
+        const snd = scene?.sound;
+        if (!snd || !snd.context) return;
+
+        console.log('🔊 unlockFromUserGesture called, context state:', snd.context.state);
+
+        // AudioContextがsuspendedの場合はresumeを試みる
+        if (snd.context.state === 'suspended') {
+            try {
+                await snd.context.resume();
+                console.log('🔊 AudioContext resumed! New state:', snd.context.state);
+            } catch (err) {
+                console.log('🔊 Resume failed:', err);
+            }
+        }
+
+        // PhaserのSoundManagerがロックされている場合はアンロック
+        if (snd.locked) {
+            try {
+                snd.unlock();
+            } catch (err) {
+                console.debug('Sound unlock failed', err);
+            }
+        }
+
+        // アンロック状態を更新
+        if (snd.context.state === 'running' && !snd.locked) {
+            this.unlocked = true;
+            console.log('🔊 AudioManager unlocked successfully!');
+            
+            // 保留中のBGMがあれば再生
+            if (this.pendingBgm) {
+                console.log('🔊 Playing pending BGM:', this.pendingBgm.key);
+                const pending = this.pendingBgm;
+                this.pendingBgm = null;
+                this.playBgm(pending.scene, pending.key, pending.config);
+            }
+        }
     }
 }
 
@@ -950,7 +1044,7 @@ const DOG_TYPES = {
         feature: 'hairless',
         isSecret: true,
     },
-    // 29: ゴールデンワンコ（伝説ワンコ！ステージ選択で1/50で遭遇）
+    // 29: ゴールデンワンコ（でんせつワンコ！ゴールデンレトリバーを連れてチャレンジモードで遭遇）
     29: {
         name: 'ゴールデンワンコ',
         color: 0xFFD700,
@@ -958,9 +1052,8 @@ const DOG_TYPES = {
         earType: 'floppy',
         eyeType: 'sparkle',
         feature: 'golden_sparkle',
-        isSecret: true,  // 図鑑で「???」表示
-        isSpecialEncounter: true,  // 特殊遭遇フラグ
-        isLegendary: true,  // 伝説ワンコ（特別枠！）
+        isSecret: true,
+        isLegendary: true,
     },
     // 30: ボーダーコリー
     30: {
@@ -1707,32 +1800,32 @@ const COSTUME_ITEMS = {
 // 【構成の意図】
 // 1. プレミアムセットを最上位に配置（アンカリング）
 // 2. 広告消し480円、いろどり980円でセットがお得に見える
-//    → プレミアムセット1168円（1460円の20%OFF）が「超お得」に
+//    → プレミアムセット1160円（1460円の約21%OFF）が「超お得」に
 // 3. ワンちゃん単品300円でマイクロトランザクション誘導
 //    → 一度課金すると心理的ハードルが下がる
 // ========================================
 const SHOP_ITEMS = {
     // ★ ヒーロー商品（最も売りたい）
-    // 単品合計: 480+980=1460円 → セット価格1168円で20%OFF
+    // 単品合計: 480+980=1460円 → セット価格1160円で約21%OFF
     deluxe: {
         id: 'deluxe',
+        storeProductId: 'com.kerofen.inusanpo.deluxe',
         name: 'プレミアムセット',
         description: '広告けし＋いろどりパック まとめておとく！',
-        price: 1168,
-        originalPrice: 1460,  // 単品合計価格（アンカリング用）
+        fallbackPrice: '¥1,160',
         icon: '👑',
         iconKey: 'pack_premium',
         color: 0xFFD700,
         badge: '🔥 一番人気！',
-        discountBadge: '20%OFF',
         isHero: true,
     },
     // ★ 中間価格帯
     allCustomize: {
         id: 'allCustomize',
+        storeProductId: 'com.kerofen.inusanpo.customize',
         name: 'いろどりパック',
         description: '肉球カラーやきせかえ、\nテーマをぜんぶ解放！',
-        price: 980,
+        fallbackPrice: '¥980',
         icon: '🎨',
         iconKey: 'pack_customize',
         color: 0xE91E63,
@@ -1740,9 +1833,10 @@ const SHOP_ITEMS = {
     // ★ デコイ（いろどりより高いのに単機能）
     adFree: {
         id: 'adFree',
+        storeProductId: 'com.kerofen.inusanpo.remove_ads',
         name: 'こうこくけし',
         description: 'すべての広告を削除します',
-        price: 480,
+        fallbackPrice: '¥480',
         icon: '🔇',
         iconKey: 'pack_noads',
         color: 0x4CAF50,
@@ -1750,9 +1844,10 @@ const SHOP_ITEMS = {
     // ★ マイクロトランザクション（購入ハードルを下げる）
     singleDog: {
         id: 'singleDog',
+        storeProductId: 'com.kerofen.inusanpo.single_dog',
         name: 'ワンコを迎える',
         description: 'すきなワンコを１匹えらべる！',
-        price: 300,
+        fallbackPrice: '¥300',
         icon: '🐕',
         iconKey: 'pack_dog',
         color: 0xFF9800,
@@ -4094,16 +4189,16 @@ class BootScene extends Phaser.Scene {
             // 課金マネージャー初期化
             await PurchaseManager.initialize();
             console.log('✅ PurchaseManager 初期化完了');
-
+            
             // 広告削除状態をゲームデータに同期
-            if (PurchaseManager.isAdsRemoved()) {
+            if (PurchaseManager.isAdsRemoved && PurchaseManager.isAdsRemoved()) {
                 AdManager.removeAds();
                 gameData.purchases.adFree = true;
                 GameData.save(gameData);
             }
 
             // プレミアム犬種パック状態を同期
-            if (PurchaseManager.hasPremiumDogs()) {
+            if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
                 gameData.purchases.premiumDogs = true;
                 GameData.save(gameData);
             }
@@ -9378,11 +9473,10 @@ class ClearScene extends Phaser.Scene {
             const btn = this.createButton(width / 2, height * 0.82, 'つぎへ！', DOG_TYPES[2].color, async () => {
                 HapticManager.impact('Light');
                 
-                // 🎯 広告表示（5ステージごと）
+                // 🎯 広告表示（AD_INTERVAL ステージごと）
                 try {
-                    await AdManager.onStageClear();
+                    await AdManager.onStageEnd();
                 } catch (e) {
-                    // 広告エラーは無視して続行
                     console.log('広告表示スキップ:', e.message);
                 }
                 
@@ -9473,11 +9567,10 @@ class ClearScene extends Phaser.Scene {
 
         // 自動で次へ（広告表示後）
         this.time.delayedCall(1800, async () => {
-            // 🎯 広告表示（5ステージごと）
+            // 🎯 広告表示（AD_INTERVAL ステージごと）
             try {
-                await AdManager.onStageClear();
+                await AdManager.onStageEnd();
             } catch (e) {
-                // 広告エラーは無視して続行
                 console.log('広告表示スキップ:', e.message);
             }
 
@@ -9662,8 +9755,13 @@ class GameOverScene extends Phaser.Scene {
         // 🎯 桜井イズム：リトライボタンを目立たせて再挑戦を促す
         this.time.delayedCall(400, () => {
             // リトライボタン（大きく、目立つ色で！）
-            const retryBtn = this.createButton(width / 2, height * 0.92, 'もういっかい！', DOG_TYPES[1].color, () => {
+            const retryBtn = this.createButton(width / 2, height * 0.92, 'もういっかい！', DOG_TYPES[1].color, async () => {
                 HapticManager.impact('Light');
+                try {
+                    await AdManager.onStageEnd();
+                } catch (e) {
+                    console.log('広告表示スキップ:', e.message);
+                }
                 this.cameras.main.fadeOut(200);
                 this.time.delayedCall(200, () => {
                     this.scene.start('GameScene', { mode: 'challenge' });
@@ -9842,11 +9940,11 @@ class ShopScene extends Phaser.Scene {
                 AudioManager.playSfx(this, 'sfx_achievement');
 
                 // ゲームデータに反映
-                if (PurchaseManager.isAdsRemoved()) {
+                if (PurchaseManager.isAdsRemoved && PurchaseManager.isAdsRemoved()) {
                     gameData.purchases.adFree = true;
                     AdManager.removeAds();
                 }
-                if (PurchaseManager.hasPremiumDogs()) {
+                if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
                     gameData.purchases.premiumDogs = true;
                 }
                 GameData.save(gameData);
@@ -9931,7 +10029,14 @@ class ShopScene extends Phaser.Scene {
         const { width, height } = this.scale;
         const startY = SAFE.TOP + 85;
         
-        const products = Object.values(SHOP_ITEMS);
+        // StoreKitから実際の価格を取得してSHOP_ITEMSに反映
+        const products = Object.values(SHOP_ITEMS).map(product => {
+            const storePrice = PurchaseManager.getFormattedPrice(product.storeProductId);
+            return {
+                ...product,
+                displayPrice: storePrice !== '---' ? storePrice : product.fallbackPrice,
+            };
+        });
         let currentY = startY;
 
         products.forEach((product, i) => {
@@ -10013,33 +10118,6 @@ class ShopScene extends Phaser.Scene {
                 ease: 'Sine.easeInOut'
             });
 
-            // 20%OFFバッジ（右側に追加）- コンテナにまとめて一体化
-            if (product.discountBadge) {
-                const discountBadge = this.add.container(cardW / 2 - 45, 0);
-                const discountBg = this.add.graphics();
-                discountBg.fillStyle(0x00AA00, 1);
-                discountBg.fillRoundedRect(-40, -16, 80, 32, 16);
-                discountBadge.add(discountBg);
-
-                const discountText = this.add.text(0, 0, product.discountBadge, {
-                    fontFamily: 'KeiFont, sans-serif',
-                    fontSize: '16px',
-                    color: '#FFFFFF',
-                    fontStyle: 'bold',
-                }).setOrigin(0.5);
-                discountBadge.add(discountText);
-                card.add(discountBadge);
-
-                // 同じアニメーション設定で揺れる
-                this.tweens.add({
-                    targets: discountBadge,
-                    scale: { from: 1, to: 1.08 },
-                    duration: 600,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
-            }
         }
 
         // アイコン（画像アイコン）- 大きく！
@@ -10085,35 +10163,17 @@ class ShopScene extends Phaser.Scene {
             }).setOrigin(1, 0.5);
             card.add(purchasedText);
         } else {
-            // 元値（取り消し線）- アンカリング効果
-            if (product.originalPrice) {
-                const origPriceY = cardH / 2 - 18;  // 「ト」と被らないよう下にずらす
-                const origPriceText = this.add.text(cardW / 2 - 58, origPriceY, `¥${product.originalPrice}`, {
-                    fontFamily: 'KeiFont, sans-serif',
-                    fontSize: '15px',
-                    color: '#888888',
-                }).setOrigin(0.5);
-                card.add(origPriceText);
-
-                // 取り消し線
-                const strike = this.add.graphics();
-                strike.lineStyle(3, 0xFF4444, 0.9);
-                strike.lineBetween(cardW / 2 - 88, origPriceY, cardW / 2 - 28, origPriceY);
-                card.add(strike);
-            }
-
-            // 現在価格（大きく目立つように！）
+            // 現在価格（StoreKitから取得した実価格を表示）
             const priceBg = this.add.graphics();
             priceBg.fillStyle(product.color, 1);
             priceBg.fillRoundedRect(cardW / 2 - 110, cardH / 2 - 5, 100, 50, 14);
-            // 枠で強調
             priceBg.lineStyle(3, 0xFFFFFF, 0.5);
             priceBg.strokeRoundedRect(cardW / 2 - 110, cardH / 2 - 5, 100, 50, 14);
             card.add(priceBg);
 
-            const priceLabel = this.add.text(cardW / 2 - 60, cardH / 2 + 20, `¥${product.price}`, {
+            const priceLabel = this.add.text(cardW / 2 - 60, cardH / 2 + 20, product.displayPrice, {
                 fontFamily: 'KeiFont, sans-serif',
-                fontSize: '24px',
+                fontSize: '22px',
                 color: '#FFFFFF',
                 fontStyle: 'bold',
                 stroke: '#000000',
@@ -10211,9 +10271,9 @@ class ShopScene extends Phaser.Scene {
             priceBg.fillRoundedRect(cardW / 2 - 78, cardH / 2 - 15, 68, 30, 10);
             card.add(priceBg);
 
-            const priceLabel = this.add.text(cardW / 2 - 44, cardH / 2, `¥${product.price}`, {
+            const priceLabel = this.add.text(cardW / 2 - 44, cardH / 2, product.displayPrice, {
                 fontFamily: 'KeiFont, sans-serif',
-                fontSize: '15px',
+                fontSize: '14px',
                 color: '#FFFFFF',
                 fontStyle: 'bold',
             }).setOrigin(0.5);
@@ -10437,26 +10497,60 @@ class ShopScene extends Phaser.Scene {
         });
     }
 
-    // ワンちゃん1匹購入
-    purchaseSingleDog(dogId, dog, overlay, modalBg, title, closeBtn, dogButtons, scrollContainer) {
-        // UIをクリーンアップ
-        overlay.destroy();
-        modalBg.destroy();
-        title.destroy();
-        closeBtn.destroy();
-        if (scrollContainer) scrollContainer.destroy();
-        dogButtons.forEach(b => b.destroy());
+    // ワンちゃん1匹購入（実際のIAP購入処理を実行）
+    async purchaseSingleDog(dogId, dog, overlay, modalBg, title, closeBtn, dogButtons, scrollContainer) {
+        const { width, height } = this.scale;
+        
+        // ローディング表示
+        const loadingText = this.add.text(width / 2, height / 2, 'しょりちゅう...', {
+            fontFamily: 'KeiFont, sans-serif',
+            fontSize: '18px',
+            color: '#5D4037',
+            fontStyle: 'bold',
+            stroke: '#FFFFFF',
+            strokeThickness: 4,
+        }).setOrigin(0.5).setDepth(400);
 
-        // 犬を解放
-        if (!gameData.unlockedDogs.includes(dogId)) {
-            gameData.unlockedDogs.push(dogId);
-            const today = new Date().toISOString().split('T')[0];
-            gameData.dogUnlockDates[dogId] = today;
-            GameData.save(gameData);
+        try {
+            // 実際のIAP購入処理を呼び出す
+            console.log('[Shop] ワンコを迎える購入開始: dogId=', dogId);
+            const purchaseResult = await PurchaseManager.purchaseSingleDog();
+            console.log('[Shop] ワンコを迎える購入結果:', purchaseResult);
+
+            loadingText.destroy();
+
+            if (purchaseResult.success) {
+                // UIをクリーンアップ
+                overlay.destroy();
+                modalBg.destroy();
+                title.destroy();
+                closeBtn.destroy();
+                if (scrollContainer) scrollContainer.destroy();
+                dogButtons.forEach(b => b.destroy());
+
+                // 犬を解放
+                if (!gameData.unlockedDogs.includes(dogId)) {
+                    gameData.unlockedDogs.push(dogId);
+                    const today = new Date().toISOString().split('T')[0];
+                    gameData.dogUnlockDates[dogId] = today;
+                    GameData.save(gameData);
+                }
+
+                HapticManager.notification('Success');
+                AudioManager.playSfx(this, 'sfx_achievement');
+                this.showPurchaseSuccess({ name: dog.name, icon: '🐕' });
+            } else {
+                // 購入キャンセルまたはエラー - モーダルは閉じない
+                HapticManager.notification('Error');
+                this.showPurchaseError(purchaseResult.error || '購入がキャンセルされました');
+            }
+
+        } catch (error) {
+            loadingText.destroy();
+            console.error('[Shop] ワンコを迎える購入エラー:', error);
+            HapticManager.notification('Error');
+            this.showPurchaseError('購入処理中にエラーが発生しました');
         }
-
-        AudioManager.playSfx(this, 'sfx_achievement');
-        this.showPurchaseSuccess({ name: dog.name, icon: '🐕' });
     }
 
     // 購入処理（実際のIAP使用）
@@ -10476,15 +10570,21 @@ class ShopScene extends Phaser.Scene {
             let purchaseResult;
 
             // 商品タイプに応じて購入処理
-            if (product.id === 'adFree' || product.id === 'deluxe') {
-                // 広告削除を含む購入
-                purchaseResult = await PurchaseManager.purchaseRemoveAds();
+            if (product.id === 'deluxe') {
+                // プレミアムセット（広告削除＋いろどりパック）
+                purchaseResult = await PurchaseManager.purchaseDeluxe();
             } else if (product.id === 'allCustomize') {
                 // いろどりパック
-                purchaseResult = await PurchaseManager.purchasePremiumDogs();
+                purchaseResult = await PurchaseManager.purchaseCustomize();
+            } else if (product.id === 'adFree') {
+                // 広告削除
+                purchaseResult = await PurchaseManager.purchaseRemoveAds();
+            } else if (product.id === 'singleDog') {
+                // ワンコを迎える（消費型）
+                purchaseResult = await PurchaseManager.purchaseSingleDog();
             } else {
-                // その他の商品は従来の方式（ローカル保存のみ）
-                purchaseResult = { success: true };
+                // 未知の商品
+                purchaseResult = { success: false, error: '不明な商品です' };
             }
 
             loadingText.destroy();
@@ -10800,29 +10900,57 @@ class SettingsScene extends Phaser.Scene {
         return container;
     }
 
-    // 🔄 購入を復元（プレースホルダー）
-    onRestorePurchases() {
-        // TODO: 課金実装時にCapacitor IAPを呼び出す
-        // import { InAppPurchase2 } from '@ionic-native/in-app-purchase-2';
-        // InAppPurchase2.restore();
-        
-        this.showToast('購入の復元を実行しました');
-        console.log('🔄 購入を復元がタップされました（未実装）');
+    // 🔄 購入を復元
+    async onRestorePurchases() {
+        const { width, height } = this.scale;
+
+        const loadingText = this.add.text(width / 2, height / 2, '復元ちゅう...', {
+            fontFamily: 'KeiFont, sans-serif',
+            fontSize: '18px',
+            color: '#5D4037',
+            fontStyle: 'bold',
+            stroke: '#FFFFFF',
+            strokeThickness: 4,
+        }).setOrigin(0.5).setDepth(400);
+
+        try {
+            const result = await PurchaseManager.restorePurchases();
+            loadingText.destroy();
+
+            if (result.success && result.restored.length > 0) {
+                HapticManager.notification('Success');
+
+                if (PurchaseManager.isAdsRemoved && PurchaseManager.isAdsRemoved()) {
+                    gameData.purchases.adFree = true;
+                    AdManager.removeAds();
+                }
+                if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
+                    gameData.purchases.premiumDogs = true;
+                }
+                GameData.save(gameData);
+
+                const restoredText = result.restored.join('、');
+                this.showToast(`${restoredText} を復元しました！`);
+            } else {
+                this.showToast(result.error || '復元する購入がありませんでした');
+            }
+
+        } catch (error) {
+            loadingText.destroy();
+            console.error('復元エラー:', error);
+            this.showToast('復元処理中にエラーが発生しました');
+        }
     }
 
-    // 📄 プライバシーポリシー（外部リンク）
-    onPrivacyPolicy() {
-        // TODO: 実際のプライバシーポリシーURLに変更
-        const privacyUrl = 'https://example.com/privacy-policy';
-        
-        // Capacitorの場合はBrowserプラグインを使用
-        // import { Browser } from '@capacitor/browser';
-        // Browser.open({ url: privacyUrl });
-        
-        // Web版のフォールバック
-        window.open(privacyUrl, '_blank');
-        
-        console.log('📄 プライバシーポリシーがタップされました');
+    // 📄 プライバシーポリシー（アプリ内ブラウザで表示）
+    async onPrivacyPolicy() {
+        const privacyUrl = 'https://kerofen.github.io/inusanpo/privacy-policy.html';
+        try {
+            await Browser.open({ url: privacyUrl });
+        } catch (e) {
+            // フォールバック（Web環境など）
+            window.open(privacyUrl, '_blank');
+        }
     }
 
     // 🍞 トースト通知（桜井イズム：控えめなフィードバック）
@@ -15311,7 +15439,6 @@ const gameConfig = {
     audio: {
         // AudioContextの自動開始を防ぐ（ユーザー操作後に手動で開始）
         disableWebAudio: false,
-        // 音声の自動ロック解除を無効化（手動で制御）
         noAudio: false,
     },
     scene: [
@@ -15348,7 +15475,8 @@ if (TEST_MODE) {
 }
 const game = new Phaser.Game(gameConfig);
 
-// デバッグ用にグローバル公開
-window.game = game;
-window.gameData = gameData;
-window.TEST_MODE = TEST_MODE; // テストモード状態を外部から確認可能に
+// 本番ビルドではグローバル公開しない
+if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+    window.game = game;
+    window.gameData = gameData;
+}
