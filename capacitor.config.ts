@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
     appId: 'com.kerofen.inusanpo',
     
     // アプリ名
-    appName: 'いぬさんぽ',
+    appName: 'ワンこねくと',
     
     // Webアセットのディレクトリ
     webDir: 'dist',
