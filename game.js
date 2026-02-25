@@ -4066,6 +4066,10 @@ class BootScene extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
 
+        this.textures.each((texture) => {
+            texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+        });
+
         // 🎯 広告・課金マネージャーを初期化（バックグラウンドで実行）
         this.initializeMonetization();
 
@@ -6258,17 +6262,6 @@ class SelectScene extends Phaser.Scene {
 
         AudioManager.playBgm(this, 'bgm_select');
 
-        // 🌟 ゴールデンワンコ遭遇チェック（桜井イズム：発見の喜び！）
-        // ゴールデンレトリバー(5)を参加させていて、まだ解放していない場合、1/50で遭遇
-        const hasGoldenRetriever = gameData.selectedDogs.includes(5);
-        const goldenWankoUnlocked = GameData.isDogUnlocked(gameData, 29);
-        
-        if (hasGoldenRetriever && !goldenWankoUnlocked && Math.random() < 1/50) {
-            // ゴールデンワンコに遭遇！
-            this.showGoldenWankoEncounter();
-            return;  // 通常の画面表示をスキップ
-        }
-
         // セーフエリア計算
         const headerY = SAFE.TOP + 32;  // ノッチ回避
         const headerH = 56;
@@ -6293,124 +6286,6 @@ class SelectScene extends Phaser.Scene {
         this.createPagination();
 
         this.cameras.main.fadeIn(300);
-    }
-
-    // 🌟 ゴールデンワンコ遭遇イベント
-    showGoldenWankoEncounter() {
-        const { width, height } = this.scale;
-
-        // キラキラ背景
-        const bg = this.add.graphics();
-        bg.fillGradientStyle(0xFFD700, 0xFFD700, 0xFFA500, 0xFFA500, 1);
-        bg.fillRect(0, 0, width, height);
-
-        // キラキラエフェクト
-        for (let i = 0; i < 30; i++) {
-            const star = this.add.text(
-                Phaser.Math.Between(0, width),
-                Phaser.Math.Between(0, height),
-                '✨',
-                { fontSize: Phaser.Math.Between(16, 32) + 'px' }
-            );
-            this.tweens.add({
-                targets: star,
-                alpha: { from: 0.3, to: 1 },
-                scale: { from: 0.8, to: 1.2 },
-                duration: Phaser.Math.Between(500, 1500),
-                yoyo: true,
-                repeat: -1,
-            });
-        }
-
-        // 驚きのテキスト（桜井イズム: 縁取りで派手に！）
-        const surpriseText = this.add.text(width / 2, height * 0.2, '！！！', {
-            fontFamily: 'KeiFont, sans-serif',
-            fontSize: '48px',
-            color: '#FF6B6B',
-            fontStyle: 'bold',
-            stroke: '#FFFFFF',
-            strokeThickness: 5,
-            shadow: { offsetX: 2, offsetY: 3, color: '#00000033', blur: 4, fill: true },
-        }).setOrigin(0.5).setScale(0);
-
-        this.tweens.add({
-            targets: surpriseText,
-            scale: 1,
-            duration: 500,
-            ease: 'Back.easeOut',
-        });
-
-        // ゴールデンワンコ登場
-        this.time.delayedCall(600, () => {
-            const dog = DogFaceRenderer.draw(this, width / 2, height * 0.45, 29, 50, 'excited');
-            dog.setScale(0);
-            
-            this.tweens.add({
-                targets: dog,
-                scale: 1,
-                duration: 800,
-                ease: 'Back.easeOut',
-            });
-
-            // 発見メッセージ（桜井イズム: heading + 縁取り）
-            this.time.delayedCall(400, () => {
-                const msgText = this.add.text(width / 2, height * 0.68, 'ゴールデンワンコを\nはっけん！', {
-                    ...TEXT_STYLE.heading,
-                    fontSize: '26px',
-                    align: 'center',
-                }).setOrigin(0.5).setAlpha(0);
-
-                this.tweens.add({
-                    targets: msgText,
-                    alpha: 1,
-                    duration: 500,
-                });
-            });
-        });
-
-        // 解放処理＆ボタン表示
-        this.time.delayedCall(2000, () => {
-            // 解放
-            GameData.unlockDog(gameData, 29);
-            GameData.save(gameData);
-
-            // 解放メッセージ（桜井イズム: section + 縁取り）
-            const unlockText = this.add.text(width / 2, height * 0.8, '🎉 なかまになった！', {
-                ...TEXT_STYLE.section,
-                fontSize: '22px',
-                color: '#4CAF50',
-            }).setOrigin(0.5);
-
-            // 続けるボタン
-            this.time.delayedCall(800, () => {
-                const btn = this.add.container(width / 2, height * 0.9);
-                const btnBg = this.add.graphics();
-                btnBg.fillStyle(0x4CAF50, 1);
-                btnBg.fillRoundedRect(-80, -25, 160, 50, 12);
-                const btnText = this.add.text(0, 0, 'つづける', {
-                    ...TEXT_STYLE.buttonSmall,
-                    fontSize: '18px',
-                }).setOrigin(0.5);
-                btn.add([btnBg, btnText]);
-                btn.setSize(160, 50);
-                btn.setInteractive({ useHandCursor: true });
-
-                btn.on('pointerup', () => {
-                    this.cameras.main.fadeOut(300);
-                    this.time.delayedCall(300, () => this.scene.restart());
-                });
-
-                btn.setScale(0);
-                this.tweens.add({
-                    targets: btn,
-                    scale: 1,
-                    duration: 300,
-                    ease: 'Back.easeOut',
-                });
-            });
-        });
-
-        this.cameras.main.fadeIn(500);
     }
 
     createBackButton(x, y) {
@@ -7437,7 +7312,6 @@ class GameScene extends Phaser.Scene {
         if (data.isEnd && data.type === this.curType) {
             if (path[0].row === row && path[0].col === col) return;
             path.push({ row, col });
-            this.addTrail(lr, lc, row, col);
             this.lastCell = { row, col };
 
             const key = `${row},${col}`;
@@ -15422,13 +15296,22 @@ class StampRallyScene extends Phaser.Scene {
 // ========================================
 // Phaser 設定
 // ========================================
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
 const GAME_W = 390;
 const GAME_H = 844;
 
 const gameConfig = {
-    type: Phaser.AUTO,
+    type: Phaser.WEBGL,
     parent: 'game-container',
     backgroundColor: '#87CEEB',
+    antialias: true,
+    pixelArt: false,
+    render: {
+        antialias: true,
+        antialiasGL: true,
+        mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
+        powerPreference: 'high-performance',
+    },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -15463,6 +15346,17 @@ const gameConfig = {
     ]
 };
 
+// 高DPI テキスト対応: テキスト生成時に resolution: DPR を自動付与
+if (DPR > 1) {
+    const _origText = Phaser.GameObjects.GameObjectFactory.prototype.text;
+    Phaser.GameObjects.GameObjectFactory.prototype.text = function(x, y, text, style) {
+        if (style) {
+            style = { ...style, resolution: DPR };
+        }
+        return _origText.call(this, x, y, text, style);
+    };
+}
+
 // ゲーム開始
 console.log('🐕 ワンこねくと - 桜井イズム適用版');
 if (TEST_MODE) {
@@ -15474,6 +15368,31 @@ if (TEST_MODE) {
     console.log('⚠️ ======================================');
 }
 const game = new Phaser.Game(gameConfig);
+
+// 高DPI Canvas オーバーライド: バッキングストアをDPR倍に拡大
+if (DPR > 1) {
+    game.events.once('ready', () => {
+        const canvas = game.canvas;
+        const renderer = game.renderer;
+        const gl = renderer.gl;
+
+        canvas.width = GAME_W * DPR;
+        canvas.height = GAME_H * DPR;
+        renderer.width = GAME_W * DPR;
+        renderer.height = GAME_H * DPR;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+
+        const origResize = renderer.resize.bind(renderer);
+        renderer.resize = function(w, h) {
+            origResize(w, h);
+            canvas.width = w * DPR;
+            canvas.height = h * DPR;
+            renderer.width = w * DPR;
+            renderer.height = h * DPR;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        };
+    });
+}
 
 // 本番ビルドではグローバル公開しない
 if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {

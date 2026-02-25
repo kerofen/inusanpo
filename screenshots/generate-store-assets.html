@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ワンこねくと - ストアスクリーンショット生成</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Zen Maru Gothic', sans-serif;
+    background: #f0f0f0;
+    padding: 20px;
+    color: #333;
+  }
+
+  h1 { text-align: center; margin-bottom: 10px; font-size: 28px; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+
+  .controls {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .controls label {
+    font-weight: bold;
+    margin-right: 5px;
+  }
+
+  .controls select, .controls button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .controls button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    font-weight: bold;
+    transition: background 0.2s;
+  }
+
+  .controls button:hover { background: #45a049; }
+  .controls button.export-all { background: #2196F3; }
+  .controls button.export-all:hover { background: #1976D2; }
+  .controls button.export-feature { background: #FF9800; }
+  .controls button.export-feature:hover { background: #F57C00; }
+
+  .section-title {
+    font-size: 22px;
+    margin: 30px 0 15px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #8B6914;
+    color: #8B6914;
+  }
+
+  .size-info {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 15px;
+  }
+
+  .screenshots-row {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    padding-bottom: 15px;
+  }
+
+  .screenshot-wrapper {
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .screenshot-wrapper .label {
+    font-size: 12px;
+    color: #888;
+    margin-top: 5px;
+  }
+
+  .ss-container {
+    position: relative;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .ss-container img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .ss-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .ss-text-top {
+    width: 100%;
+    padding: 8% 5% 3%;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 60%, rgba(255,255,255,0) 100%);
+  }
+
+  .ss-text-top h2 {
+    font-size: 2em;
+    color: #5D4E37;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    line-height: 1.3;
+    letter-spacing: 0.05em;
+  }
+
+  .ss-text-top .ss-sub {
+    font-size: 1em;
+    color: #8B7355;
+    margin-top: 0.3em;
+    font-weight: 700;
+  }
+
+  /* Feature Graphic Styles */
+  .feature-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 0;
+    height: 4px;
+    background: #4CAF50;
+    transition: width 0.3s;
+    z-index: 999;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 999;
+    display: none;
+    animation: fadeIn 0.3s;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .hidden { display: none; }
+
+  /* Preview scaling */
+  .preview-scale {
+    transform-origin: top left;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<div class="toast" id="toast"></div>
+
+<h1>🐕 ワンこねくと ストアアセット生成ツール</h1>
+<p class="subtitle">Apple App Store / Google Play 用スクリーンショット＆フィーチャーグラフィック</p>
+
+<div class="controls">
+  <label>プレビュー倍率:</label>
+  <select id="previewScale" onchange="updatePreviewScale()">
+    <option value="0.15">15% (全体確認)</option>
+    <option value="0.25" selected>25% (バランス)</option>
+    <option value="0.5">50% (詳細確認)</option>
+  </select>
+
+  <button class="export-all" onclick="exportAll('iphone67')">📱 iPhone 6.7" 一括保存</button>
+  <button class="export-all" onclick="exportAll('iphone65')">📱 iPhone 6.5" 一括保存</button>
+  <button class="export-all" onclick="exportAll('iphone55')">📱 iPhone 5.5" 一括保存</button>
+  <button class="export-all" onclick="exportAll('googleplay')">🤖 Google Play 一括保存</button>
+  <button class="export-all" onclick="exportAll('ipad')">📋 iPad 一括保存</button>
+  <button class="export-feature" onclick="exportFeatureGraphic()">🎨 フィーチャーグラフィック保存</button>
+  <button class="export-all" onclick="exportEverything()" style="background:#9C27B0;">⭐ 全サイズ一括保存</button>
+</div>
+
+<!-- ===== iPhone 6.7" (1290 x 2796) ===== -->
+<h2 class="section-title">📱 iPhone 6.7" — 1290 × 2796 px</h2>
+<p class="size-info">Apple App Store 必須（iPhone 15 Pro Max / iPhone 15 Plus / iPhone 14 Pro Max）</p>
+<div class="screenshots-row" id="row-iphone67"></div>
+
+<!-- ===== iPhone 6.5" (1242 x 2688) ===== -->
+<h2 class="section-title">📱 iPhone 6.5" — 1242 × 2688 px</h2>
+<p class="size-info">Apple App Store（iPhone 11 Pro Max / iPhone XS Max）</p>
+<div class="screenshots-row" id="row-iphone65"></div>
+
+<!-- ===== iPhone 5.5" (1242 x 2208) ===== -->
+<h2 class="section-title">📱 iPhone 5.5" — 1242 × 2208 px</h2>
+<p class="size-info">Apple App Store（iPhone 8 Plus / iPhone 7 Plus）</p>
+<div class="screenshots-row" id="row-iphone55"></div>
+
+<!-- ===== iPad Pro 12.9" (2048 x 2732) ===== -->
+<h2 class="section-title">📋 iPad Pro 12.9" — 2048 × 2732 px</h2>
+<p class="size-info">Apple App Store（iPad Pro 12.9インチ）</p>
+<div class="screenshots-row" id="row-ipad"></div>
+
+<!-- ===== Google Play (1080 x 1920) ===== -->
+<h2 class="section-title">🤖 Google Play — 1080 × 1920 px</h2>
+<p class="size-info">Google Play ストア スマートフォン用</p>
+<div class="screenshots-row" id="row-googleplay"></div>
+
+<!-- ===== Feature Graphic (1024 x 500) ===== -->
+<h2 class="section-title">🎨 Google Play フィーチャーグラフィック — 1024 × 500 px</h2>
+<p class="size-info">Google Play ストア上部に表示されるバナー画像</p>
+<div id="feature-graphic-area"></div>
+
+<script>
+const SCREENSHOTS = [
+  {
+    id: 'title',
+    file: 'ss_10.26.44.png',
+    ipadFile: 'ipad_ss_10.26.44.png',
+    heading: 'かわいい犬たちと\n一筆書きパズル！',
+    sub: 'つなげて遊ぼう！',
+    bgGradient: ['#87CEEB', '#98FB98'],
+  },
+  {
+    id: 'gameplay',
+    file: 'ss_10.27.00.png',
+    ipadFile: 'ipad_ss_10.27.00.png',
+    heading: 'なぞって犬を\nつなげよう！',
+    sub: '頭を使う一筆書き',
+    bgGradient: ['#B8E6B8', '#F0E68C'],
+  },
+  {
+    id: 'clear',
+    file: 'ss_10.27.14.png',
+    ipadFile: 'ipad_ss_10.27.14.png',
+    heading: 'ステージクリアで\nごほうび！',
+    sub: 'おさんぽたのしかったね！',
+    bgGradient: ['#FFD1DC', '#FFDAB9'],
+  },
+  {
+    id: 'dogget',
+    file: 'ss_10.27.18.png',
+    ipadFile: 'ipad_ss_10.27.18.png',
+    heading: '新しい犬友だちを\nゲット！',
+    sub: '全32種類以上！',
+    bgGradient: ['#FFE4B5', '#FFFACD'],
+  },
+  {
+    id: 'collection',
+    file: 'ss_10.27.34.png',
+    ipadFile: 'ipad_ss_10.27.34.png',
+    heading: '犬のずかんを\nコンプリート！',
+    sub: 'レア犬もいるよ！',
+    bgGradient: ['#DDA0DD', '#B0C4DE'],
+  },
+];
+
+const SIZES = {
+  iphone67:   { w: 1290, h: 2796, label: 'iPhone 6.7"', useIpad: false },
+  iphone65:   { w: 1242, h: 2688, label: 'iPhone 6.5"', useIpad: false },
+  iphone55:   { w: 1242, h: 2208, label: 'iPhone 5.5"', useIpad: false },
+  ipad:       { w: 2048, h: 2732, label: 'iPad 12.9"',  useIpad: true },
+  googleplay: { w: 1080, h: 1920, label: 'Google Play',  useIpad: false },
+};
+
+let currentScale = 0.25;
+
+function updatePreviewScale() {
+  currentScale = parseFloat(document.getElementById('previewScale').value);
+  renderAll();
+}
+
+function createScreenshotElement(ss, sizeKey, scale) {
+  const size = SIZES[sizeKey];
+  const w = size.w;
+  const h = size.h;
+  const displayW = w * scale;
+  const displayH = h * scale;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'screenshot-wrapper';
+
+  const container = document.createElement('div');
+  container.className = 'ss-container';
+  container.id = `ss-${sizeKey}-${ss.id}`;
+  container.style.width = w + 'px';
+  container.style.height = h + 'px';
+  container.style.transform = `scale(${scale})`;
+  container.style.transformOrigin = 'top left';
+
+  const bg = document.createElement('div');
+  bg.style.cssText = `
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, ${ss.bgGradient[0]}, ${ss.bgGradient[1]});
+  `;
+  container.appendChild(bg);
+
+  const imgFile = size.useIpad ? ss.ipadFile : ss.file;
+  const img = document.createElement('img');
+  img.src = imgFile;
+  img.style.cssText = `
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: ${w * 0.88}px;
+    height: auto;
+    max-height: ${h * 0.72}px;
+    object-fit: contain;
+    border-radius: ${w * 0.03}px ${w * 0.03}px 0 0;
+    box-shadow: 0 ${w*0.005}px ${w*0.03}px rgba(0,0,0,0.2);
+  `;
+  container.appendChild(img);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ss-overlay';
+
+  const textTop = document.createElement('div');
+  textTop.className = 'ss-text-top';
+  textTop.style.padding = `${h * 0.04}px ${w * 0.05}px ${h * 0.02}px`;
+
+  const heading = document.createElement('h2');
+  heading.style.fontSize = (w * 0.065) + 'px';
+  heading.style.color = '#5D4E37';
+  heading.style.textShadow = `0 ${w*0.002}px ${w*0.004}px rgba(255,255,255,0.8)`;
+  heading.style.lineHeight = '1.35';
+  heading.style.letterSpacing = '0.03em';
+  heading.style.fontWeight = '900';
+  heading.innerHTML = ss.heading.replace('\n', '<br>');
+
+  const sub = document.createElement('div');
+  sub.style.fontSize = (w * 0.035) + 'px';
+  sub.style.color = '#8B7355';
+  sub.style.marginTop = (h * 0.008) + 'px';
+  sub.style.fontWeight = '700';
+  sub.textContent = ss.sub;
+
+  textTop.appendChild(heading);
+  textTop.appendChild(sub);
+  overlay.appendChild(textTop);
+  container.appendChild(overlay);
+
+  const paw1 = createPawDecoration(w * 0.06, w * 0.08, h * 0.25, -15, 0.15);
+  const paw2 = createPawDecoration(w * 0.06, w * 0.85, h * 0.22, 20, 0.12);
+  container.appendChild(paw1);
+  container.appendChild(paw2);
+
+  wrapper.appendChild(container);
+  wrapper.style.width = displayW + 'px';
+  wrapper.style.height = displayH + 20 + 'px';
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = `${ss.id} (${w}×${h})`;
+  label.style.marginTop = (displayH + 5) + 'px';
+  wrapper.appendChild(label);
+
+  return wrapper;
+}
+
+function createPawDecoration(size, x, y, rotation, opacity) {
+  const paw = document.createElement('div');
+  paw.style.cssText = `
+    position: absolute;
+    left: ${x}px;
+    top: ${y}px;
+    width: ${size}px;
+    height: ${size}px;
+    opacity: ${opacity};
+    transform: rotate(${rotation}deg);
+    font-size: ${size}px;
+    line-height: 1;
+    pointer-events: none;
+  `;
+  paw.textContent = '🐾';
+  return paw;
+}
+
+function createFeatureGraphic(scale) {
+  const w = 1024;
+  const h = 500;
+
+  const container = document.createElement('div');
+  container.className = 'feature-container';
+  container.id = 'feature-graphic';
+  container.style.width = w + 'px';
+  container.style.height = h + 'px';
+  container.style.transform = `scale(${scale})`;
+  container.style.transformOrigin = 'top left';
+  container.style.position = 'relative';
+
+  const bg = document.createElement('div');
+  bg.style.cssText = `
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(135deg, #87CEEB 0%, #98FB98 50%, #F0E68C 100%);
+  `;
+  container.appendChild(bg);
+
+  const grassDiv = document.createElement('div');
+  grassDiv.style.cssText = `
+    position: absolute; bottom: 0; left: 0; right: 0; height: 35%;
+    background: linear-gradient(180deg, #7BC67B, #5DAE5D);
+    border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+  `;
+  container.appendChild(grassDiv);
+
+  const cloud1 = createCloud(120, 40, 160, 70);
+  const cloud2 = createCloud(700, 20, 200, 80);
+  const cloud3 = createCloud(450, 60, 120, 50);
+  container.appendChild(cloud1);
+  container.appendChild(cloud2);
+  container.appendChild(cloud3);
+
+  const iconImg = document.createElement('img');
+  iconImg.src = '../public/icon-512.png';
+  iconImg.style.cssText = `
+    position: absolute;
+    left: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 220px;
+    height: 220px;
+    border-radius: 44px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    background: white;
+    padding: 8px;
+  `;
+  container.appendChild(iconImg);
+
+  const textArea = document.createElement('div');
+  textArea.style.cssText = `
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    width: 600px;
+  `;
+
+  const title = document.createElement('div');
+  title.style.cssText = `
+    font-size: 80px;
+    font-weight: 900;
+    color: #5D4E37;
+    text-shadow: 0 2px 4px rgba(255,255,255,0.5), 0 0 20px rgba(255,255,255,0.3);
+    line-height: 1.2;
+    letter-spacing: 0.05em;
+  `;
+  title.innerHTML = 'ワン<br>こねくと';
+
+  const subtitle = document.createElement('div');
+  subtitle.style.cssText = `
+    font-size: 28px;
+    font-weight: 700;
+    color: #8B7355;
+    margin-top: 10px;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+  `;
+  subtitle.textContent = 'つなげて遊ぼう！一筆書きパズル 🐾';
+
+  textArea.appendChild(title);
+  textArea.appendChild(subtitle);
+  container.appendChild(textArea);
+
+  const paws = ['🐾', '🐾', '🐾'];
+  const pawPositions = [
+    { x: 320, y: 380, rot: -10, size: 30, op: 0.2 },
+    { x: 500, y: 420, rot: 15, size: 25, op: 0.15 },
+    { x: 700, y: 400, rot: -5, size: 35, op: 0.18 },
+  ];
+  pawPositions.forEach((p, i) => {
+    const paw = createPawDecoration(p.size, p.x, p.y, p.rot, p.op);
+    container.appendChild(paw);
+  });
+
+  const wrapperDiv = document.createElement('div');
+  wrapperDiv.style.width = (w * scale) + 'px';
+  wrapperDiv.style.height = (h * scale + 30) + 'px';
+  wrapperDiv.appendChild(container);
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = `Feature Graphic (${w}×${h})`;
+  label.style.marginTop = (h * scale + 5) + 'px';
+  wrapperDiv.appendChild(label);
+
+  return wrapperDiv;
+}
+
+function createCloud(x, y, w, h) {
+  const cloud = document.createElement('div');
+  cloud.style.cssText = `
+    position: absolute;
+    left: ${x}px;
+    top: ${y}px;
+    width: ${w}px;
+    height: ${h}px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 50%;
+    filter: blur(2px);
+  `;
+  return cloud;
+}
+
+function renderAll() {
+  Object.keys(SIZES).forEach(sizeKey => {
+    const row = document.getElementById('row-' + sizeKey);
+    row.innerHTML = '';
+    SCREENSHOTS.forEach(ss => {
+      row.appendChild(createScreenshotElement(ss, sizeKey, currentScale));
+    });
+  });
+
+  const fgArea = document.getElementById('feature-graphic-area');
+  fgArea.innerHTML = '';
+  fgArea.appendChild(createFeatureGraphic(currentScale));
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 3000);
+}
+
+function updateProgress(pct) {
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+async function exportSingle(elementId, filename) {
+  const el = document.getElementById(elementId);
+  const origTransform = el.style.transform;
+  el.style.transform = 'none';
+
+  try {
+    const canvas = await html2canvas(el, {
+      scale: 1,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      width: parseInt(el.style.width),
+      height: parseInt(el.style.height),
+    });
+
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch (e) {
+    console.error('Export failed:', e);
+    showToast('エクスポートエラー: ' + e.message);
+  }
+
+  el.style.transform = origTransform;
+}
+
+async function exportAll(sizeKey) {
+  const size = SIZES[sizeKey];
+  const total = SCREENSHOTS.length;
+  showToast(`${size.label} のスクリーンショットを保存中...`);
+
+  for (let i = 0; i < SCREENSHOTS.length; i++) {
+    const ss = SCREENSHOTS[i];
+    const elementId = `ss-${sizeKey}-${ss.id}`;
+    const filename = `${sizeKey}_${i + 1}_${ss.id}.png`;
+    updateProgress(((i + 1) / total) * 100);
+    await exportSingle(elementId, filename);
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  updateProgress(0);
+  showToast(`${size.label} の保存が完了しました！`);
+}
+
+async function exportFeatureGraphic() {
+  showToast('フィーチャーグラフィックを保存中...');
+  await exportSingle('feature-graphic', 'feature_graphic_1024x500.png');
+  showToast('フィーチャーグラフィックを保存しました！');
+}
+
+async function exportEverything() {
+  showToast('全サイズの保存を開始します...');
+  const allKeys = Object.keys(SIZES);
+  const totalItems = allKeys.length * SCREENSHOTS.length + 1;
+  let done = 0;
+
+  for (const sizeKey of allKeys) {
+    for (const ss of SCREENSHOTS) {
+      const elementId = `ss-${sizeKey}-${ss.id}`;
+      const filename = `${sizeKey}_${SCREENSHOTS.indexOf(ss) + 1}_${ss.id}.png`;
+      await exportSingle(elementId, filename);
+      done++;
+      updateProgress((done / totalItems) * 100);
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  await exportSingle('feature-graphic', 'feature_graphic_1024x500.png');
+  done++;
+  updateProgress(100);
+
+  setTimeout(() => updateProgress(0), 1000);
+  showToast(`全 ${totalItems} ファイルの保存が完了しました！`);
+}
+
+renderAll();
+</script>
+</body>
+</html>

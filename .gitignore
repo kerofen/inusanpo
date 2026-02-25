@@ -17,9 +17,15 @@ www/
 # IDE
 .idea/
 .vscode/
+.cursor/
+.claude/
 *.swp
 *.swo
 *~
+
+# 署名キー（秘密情報）
+android/key.properties
+android/release-key.jks
 
 # OS
 .DS_Store

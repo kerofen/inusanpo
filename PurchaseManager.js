@@ -18,9 +18,6 @@ export const PurchaseManager = {
     // 初期化済みフラグ
     initialized: false,
     
-    // 課金サポート状態
-    billingSupported: false,
-    
     // 購入済み商品の状態
     purchaseState: {
         removeAds: false,      // 広告削除
@@ -61,15 +58,6 @@ export const PurchaseManager = {
         }
         
         try {
-            // 課金サポート確認
-            const { isBillingSupported } = await NativePurchases.isBillingSupported();
-            this.billingSupported = isBillingSupported;
-            
-            if (!isBillingSupported) {
-                console.warn('[PurchaseManager] この端末では課金がサポートされていません');
-                return;
-            }
-            
             // LocalStorageから購入状態を復元
             this.loadPurchaseState();
             
@@ -91,9 +79,6 @@ export const PurchaseManager = {
      * 商品情報を取得
      */
     async loadProducts() {
-        if (!this.billingSupported) {
-            return [];
-        }
         
         try {
             // 非消費型商品を取得
@@ -141,7 +126,7 @@ export const PurchaseManager = {
      * @returns {Object|null} 商品情報
      */
     getProduct(productId) {
-        return this.products.find(p => p.productIdentifier === productId) || null;
+        return this.products.find(p => (p.identifier || p.productIdentifier) === productId) || null;
     },
     
     /**
@@ -194,10 +179,6 @@ export const PurchaseManager = {
             return { success: false, error: 'Web環境では購入できません' };
         }
         
-        if (!this.billingSupported) {
-            return { success: false, error: 'この端末では課金がサポートされていません' };
-        }
-        
         try {
             console.log(`[PurchaseManager] 購入開始: ${this.PRODUCT_IDS.SINGLE_DOG}`);
             
@@ -248,10 +229,6 @@ export const PurchaseManager = {
     async purchaseProduct(productId, stateKey) {
         if (Capacitor.getPlatform() === 'web') {
             return { success: false, error: 'Web環境では購入できません' };
-        }
-        
-        if (!this.billingSupported) {
-            return { success: false, error: 'この端末では課金がサポートされていません' };
         }
         
         try {
@@ -347,23 +324,18 @@ export const PurchaseManager = {
             return { success: false, restored: [], error: 'Web環境では復元できません' };
         }
         
-        if (!this.billingSupported) {
-            return { success: false, restored: [], error: 'この端末では課金がサポートされていません' };
-        }
-        
         try {
             console.log('[PurchaseManager] 購入復元開始');
             
-            // ストア側のキャッシュを更新
-            await NativePurchases.restorePurchases();
+            const result = await NativePurchases.restorePurchases();
+            console.log('[PurchaseManager] 復元結果:', result);
             
-            // 購入履歴を取得
-            const { purchases } = await NativePurchases.getPurchases({
-                productType: PURCHASE_TYPE.INAPP,
-            });
-            console.log('[PurchaseManager] 購入履歴:', purchases);
+            const customerInfo = result?.customerInfo;
+            const purchasedIds = customerInfo?.allPurchasedProductIdentifiers || [];
+            console.log('[PurchaseManager] 購入済み商品ID:', purchasedIds);
             
-            const restored = this._processPurchases(purchases || []);
+            const transactions = purchasedIds.map(id => ({ productIdentifier: id }));
+            const restored = this._processPurchases(transactions);
             
             if (restored.length > 0) {
                 console.log('[PurchaseManager] 復元完了:', restored);
@@ -383,13 +355,11 @@ export const PurchaseManager = {
      */
     async restorePurchasesSilent() {
         try {
-            await NativePurchases.restorePurchases();
-            
-            const { purchases } = await NativePurchases.getPurchases({
-                productType: PURCHASE_TYPE.INAPP,
-            });
-            
-            this._processPurchases(purchases || []);
+            const result = await NativePurchases.restorePurchases();
+            const customerInfo = result?.customerInfo;
+            const purchasedIds = customerInfo?.allPurchasedProductIdentifiers || [];
+            const transactions = purchasedIds.map(id => ({ productIdentifier: id }));
+            this._processPurchases(transactions);
         } catch (error) {
             console.log('[PurchaseManager] サイレント復元スキップ:', error.message);
         }
