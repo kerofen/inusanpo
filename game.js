@@ -1954,9 +1954,9 @@ class GameData {
                 }
                 // チュートリアル設定のマイグレーション（既存ユーザー対応）
                 if (!data.tutorial) {
-                    // 既存ユーザーはチュートリアル完了済みとみなす
+                    const hasPlayed = data.stats && data.stats.totalClears > 0;
                     data.tutorial = {
-                        completed: true,
+                        completed: hasPlayed,
                         step: 0,
                         inProgress: false,
                     };
@@ -1981,7 +1981,7 @@ class GameData {
         // ★ テストモードは先頭の TEST_MODE_UNLOCK_ALL で制御
         if (TEST_MODE_UNLOCK_ALL) return true;
         
-        if (data.purchases?.deluxe || data.purchases?.allDogs) return true;
+        if (data.purchases?.allDogs) return true;
         return data.unlockedDogs.includes(dogId);
     }
 
@@ -4198,12 +4198,6 @@ class BootScene extends Phaser.Scene {
             if (PurchaseManager.isAdsRemoved && PurchaseManager.isAdsRemoved()) {
                 AdManager.removeAds();
                 gameData.purchases.adFree = true;
-                GameData.save(gameData);
-            }
-
-            // プレミアム犬種パック状態を同期
-            if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
-                gameData.purchases.premiumDogs = true;
                 GameData.save(gameData);
             }
 
@@ -8233,7 +8227,7 @@ class AchievementUnlockScene extends Phaser.Scene {
     init(data) {
         this.newAchievements = data.newAchievements || [];
         this.tutorialMode = data.tutorialMode || false;
-        this.currentIndex = 0;
+        this.currentIndex = data.currentIndex || 0;
         // ★ 追加：アイテム獲得（にくきゅう・テーマ）
         this.newItemUnlocks = data.newItemUnlocks || [];
     }
@@ -8418,7 +8412,8 @@ class AchievementUnlockScene extends Phaser.Scene {
                 this.scene.restart({
                     newAchievements: this.newAchievements,
                     tutorialMode: this.tutorialMode,
-                    currentIndex: this.currentIndex
+                    currentIndex: this.currentIndex,
+                    newItemUnlocks: this.newItemUnlocks
                 });
             } else {
                 this.goToNext();
@@ -9818,9 +9813,6 @@ class ShopScene extends Phaser.Scene {
                     gameData.purchases.adFree = true;
                     AdManager.removeAds();
                 }
-                if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
-                    gameData.purchases.premiumDogs = true;
-                }
                 GameData.save(gameData);
 
                 const restoredText = result.restored.join('、');
@@ -9931,7 +9923,8 @@ class ShopScene extends Phaser.Scene {
         const { width } = this.scale;
         const cardW = width - 20;  // 幅を広く
         const cardH = 155;  // 高さを大きく
-        const isPurchased = gameData.purchases?.[product.id];
+        const isPurchased = gameData.purchases?.[product.id]
+            || (product.id === 'deluxe' && gameData.purchases?.adFree && gameData.purchases?.allCustomize);
 
         const card = this.add.container(x, y);
 
@@ -10429,6 +10422,10 @@ class ShopScene extends Phaser.Scene {
 
     // 購入処理（実際のIAP使用）
     async processPurchase(product) {
+        if (product.id === 'deluxe' && gameData.purchases?.adFree && gameData.purchases?.allCustomize) {
+            return;
+        }
+
         // ローディング表示
         const { width, height } = this.scale;
         const loadingText = this.add.text(width / 2, height / 2, 'しょりちゅう...', {
@@ -10797,9 +10794,6 @@ class SettingsScene extends Phaser.Scene {
                 if (PurchaseManager.isAdsRemoved && PurchaseManager.isAdsRemoved()) {
                     gameData.purchases.adFree = true;
                     AdManager.removeAds();
-                }
-                if (PurchaseManager.hasPremiumDogs && PurchaseManager.hasPremiumDogs()) {
-                    gameData.purchases.premiumDogs = true;
                 }
                 GameData.save(gameData);
 
@@ -15309,6 +15303,7 @@ const gameConfig = {
     render: {
         antialias: true,
         antialiasGL: true,
+        roundPixels: true,
         mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
         powerPreference: 'high-performance',
     },
@@ -15346,6 +15341,21 @@ const gameConfig = {
     ]
 };
 
+// 高DPI Graphics品質: 楕円のデフォルトセグメント数を32→64に引き上げ
+const _Graphics = Phaser.GameObjects.Graphics.prototype;
+['fillEllipse', 'strokeEllipse'].forEach(method => {
+    const orig = _Graphics[method];
+    _Graphics[method] = function(x, y, w, h, smoothness) {
+        return orig.call(this, x, y, w, h, smoothness || 64);
+    };
+});
+['fillEllipseShape', 'strokeEllipseShape'].forEach(method => {
+    const orig = _Graphics[method];
+    _Graphics[method] = function(ellipse, smoothness) {
+        return orig.call(this, ellipse, smoothness || 64);
+    };
+});
+
 // 高DPI テキスト対応: テキスト生成時に resolution: DPR を自動付与
 if (DPR > 1) {
     const _origText = Phaser.GameObjects.GameObjectFactory.prototype.text;
@@ -15369,28 +15379,81 @@ if (TEST_MODE) {
 }
 const game = new Phaser.Game(gameConfig);
 
-// 高DPI Canvas オーバーライド: バッキングストアをDPR倍に拡大
+// 高DPI Canvas: 物理ピクセル解像度でレンダリング
+// Phaserのゲーム座標(390x844)を維持しつつ、canvasバッキングストアを
+// DPR倍の物理解像度(1170x2532@3x)にすることでジャギーを解消する。
+// 方式: gl.viewport/scissorをObject.definePropertyで確実にインターセプトし、
+// rendererのresizeとdrawingBufferHeightを正しくDPR対応にオーバーライド。
 if (DPR > 1) {
     game.events.once('ready', () => {
         const canvas = game.canvas;
         const renderer = game.renderer;
         const gl = renderer.gl;
+        const glProto = Object.getPrototypeOf(gl);
+        const _viewport = glProto.viewport;
+        const _scissor = glProto.scissor;
+        const _bindFB = glProto.bindFramebuffer;
 
-        canvas.width = GAME_W * DPR;
-        canvas.height = GAME_H * DPR;
-        renderer.width = GAME_W * DPR;
-        renderer.height = GAME_H * DPR;
-        gl.viewport(0, 0, canvas.width, canvas.height);
+        let renderingToCanvas = true;
 
-        const origResize = renderer.resize.bind(renderer);
-        renderer.resize = function(w, h) {
-            origResize(w, h);
-            canvas.width = w * DPR;
-            canvas.height = h * DPR;
-            renderer.width = w * DPR;
-            renderer.height = h * DPR;
-            gl.viewport(0, 0, canvas.width, canvas.height);
+        Object.defineProperty(gl, 'bindFramebuffer', {
+            value: function(target, fb) {
+                renderingToCanvas = (fb === null);
+                return _bindFB.call(gl, target, fb);
+            },
+            writable: true, configurable: true
+        });
+
+        Object.defineProperty(gl, 'viewport', {
+            value: function(x, y, w, h) {
+                if (renderingToCanvas) {
+                    return _viewport.call(gl, x * DPR, y * DPR, w * DPR, h * DPR);
+                }
+                return _viewport.call(gl, x, y, w, h);
+            },
+            writable: true, configurable: true
+        });
+
+        Object.defineProperty(gl, 'scissor', {
+            value: function(x, y, w, h) {
+                if (renderingToCanvas) {
+                    return _scissor.call(gl, x * DPR, y * DPR, w * DPR, h * DPR);
+                }
+                return _scissor.call(gl, x, y, w, h);
+            },
+            writable: true, configurable: true
+        });
+
+        let _storedDBH = GAME_H;
+        Object.defineProperty(renderer, 'drawingBufferHeight', {
+            get: function() { return renderingToCanvas ? GAME_H : _storedDBH; },
+            set: function(v) { _storedDBH = v; },
+            configurable: true
+        });
+
+        renderer.resize = function(width, height) {
+            this.width = width;
+            this.height = height;
+            this.setProjectionMatrix(width, height);
+
+            canvas.width = width * DPR;
+            canvas.height = height * DPR;
+
+            gl.viewport(0, 0, width, height);
+
+            _storedDBH = canvas.height;
+
+            gl.scissor(0, 0, width, height);
+
+            this.defaultScissor[0] = 0;
+            this.defaultScissor[1] = 0;
+            this.defaultScissor[2] = width;
+            this.defaultScissor[3] = height;
+
+            this.emit('resize', width, height);
         };
+
+        renderer.resize(GAME_W, GAME_H);
     });
 }
 

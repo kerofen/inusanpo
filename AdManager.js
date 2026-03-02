@@ -23,6 +23,9 @@ export const AdManager = {
     // 広告表示間隔（何ステージごとに広告を表示するか）
     AD_INTERVAL: 3,
     
+    // ★ デバッグモード（開発中はtrue、リリース時にfalseに変更）
+    DEBUG_ADS: false,
+    
     // テスト用広告ユニットID（Google公式テストID）
     TEST_AD_IDS: {
         android: {
@@ -72,7 +75,7 @@ export const AdManager = {
             // AdMob初期化
             await AdMob.initialize({
                 testingDevices: [],
-                initializeForTesting: false
+                initializeForTesting: this.DEBUG_ADS
             });
             
             // イベントリスナーを設定
@@ -136,7 +139,7 @@ export const AdManager = {
      */
     getInterstitialId() {
         const platform = Capacitor.getPlatform();
-        const adIds = this.PRODUCTION_AD_IDS;
+        const adIds = this.DEBUG_ADS ? this.TEST_AD_IDS : this.PRODUCTION_AD_IDS;
         return adIds[platform]?.interstitial || '';
     },
     
@@ -161,7 +164,7 @@ export const AdManager = {
             
             await AdMob.prepareInterstitial({
                 adId: adId,
-                isTesting: false
+                isTesting: this.DEBUG_ADS
             });
             
             console.log('[AdManager] インタースティシャル広告を準備中...');

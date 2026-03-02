@@ -30,6 +30,8 @@ android/release-key.jks
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+ehthumbs.db
 
 # ログ
 logs/
@@ -42,4 +44,17 @@ coverage/
 # キャッシュ
 .cache/
 .parcel-cache/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.mypy_cache/
+
+# シミュレータスクリーンショット（ルート直下の自動生成物）
+Simulator Screenshot*
+
+# バックアップファイル
+**/_backup/
+**/_backup_originals/
 

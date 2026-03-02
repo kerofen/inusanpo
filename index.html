@@ -44,10 +44,17 @@
         }
 
         canvas {
-            border-radius: 20px;
-            box-shadow:
-                0 20px 60px rgba(255, 182, 193, 0.4),
-                0 0 0 1px rgba(255, 255, 255, 0.8);
+            image-rendering: auto;
+            -webkit-image-rendering: auto;
+        }
+
+        @media (min-width: 768px) {
+            canvas {
+                border-radius: 20px;
+                box-shadow:
+                    0 20px 60px rgba(255, 182, 193, 0.4),
+                    0 0 0 1px rgba(255, 255, 255, 0.8);
+            }
         }
     </style>
 </head>
