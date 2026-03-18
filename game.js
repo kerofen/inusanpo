@@ -9,6 +9,7 @@ import { HapticManager } from './HapticManager.js';
 import { AdManager } from './AdManager.js';
 import { PurchaseManager } from './PurchaseManager.js';
 import { Browser } from '@capacitor/browser';
+import { AnalyticsManager } from './AnalyticsManager.js';
 
 // AudioContext警告・エラーを抑制（ユーザー操作後に正常に開始されるため無害）
 // 音声ファイルのデコードエラーも抑制（SEを作り直すため）
@@ -51,6 +52,13 @@ const TEST_MODE = false;
 
 // 下位互換性のためのエイリアス
 const TEST_MODE_UNLOCK_ALL = TEST_MODE;
+
+// ========================================
+// 🦍 ゴリラモード設定（コード上でON/OFF可能）
+// true: チャレンジ1回クリア後、次回チャレンジでゴリラ確定
+// false: 従来どおり1/500で遭遇
+// ========================================
+const GORILLA_MODE_ENABLED = false;
 
 // ========================================
 // サウンド管理（BGM/SEの一元コントロール）
@@ -1873,6 +1881,7 @@ class GameData {
                 totalClears: 0,
                 challengeHighScore: 0,
                 challengeCurrentStreak: 0,
+                totalChallengeClears: 0,
                 maxComboCount: 0,
                 goldenClears: 0,
                 dogUsage: {},
@@ -1915,6 +1924,7 @@ class GameData {
                 seEnabled: true,
                 bgmVolume: 1.0,
                 seVolume: 1.0,
+                vibrationEnabled: true,
             },
             purchases: {
                 adFree: false,
@@ -1950,6 +1960,9 @@ class GameData {
                     }
                     if (typeof data.settings.seVolume !== 'number') {
                         data.settings.seVolume = 1.0;
+                    }
+                    if (typeof data.settings.vibrationEnabled === 'undefined') {
+                        data.settings.vibrationEnabled = true;
                     }
                 }
                 // チュートリアル設定のマイグレーション（既存ユーザー対応）
@@ -2000,6 +2013,7 @@ class GameData {
         if (!data.stats.dayOfWeekClears) data.stats.dayOfWeekClears = {};
         if (!data.stats.dogSpecificClears) data.stats.dogSpecificClears = {};
         if (!data.stats.consecutiveLogins) data.stats.consecutiveLogins = 0;
+        if (typeof data.stats.totalChallengeClears !== 'number') data.stats.totalChallengeClears = 0;
 
         switch (type) {
             case 'clear':
@@ -2017,6 +2031,7 @@ class GameData {
                 break;
             case 'challenge_clear':
                 data.stats.challengeCurrentStreak += value;
+                data.stats.totalChallengeClears += value;
                 if (data.stats.challengeCurrentStreak > data.stats.challengeHighScore) {
                     data.stats.challengeHighScore = data.stats.challengeCurrentStreak;
                 }
@@ -2671,6 +2686,7 @@ class DailyManager {
 // グローバルゲームデータ
 let gameData = GameData.load();
 AudioManager.applySettings(gameData.settings);
+HapticManager.isEnabled = gameData.settings?.vibrationEnabled !== false;
 
 let LEVELS = [];
 
@@ -4186,6 +4202,10 @@ class BootScene extends Phaser.Scene {
      */
     async initializeMonetization() {
         try {
+            // Firebase Analytics 初期化
+            await AnalyticsManager.initialize();
+            AnalyticsManager.logAppOpen();
+
             // 広告マネージャー初期化
             await AdManager.initialize();
             console.log('✅ AdManager 初期化完了');
@@ -4224,6 +4244,7 @@ class TitleScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.scale;
+        AnalyticsManager.setScreenName('TitleScene');
 
         // デイリーチェック＆リセット
         gameData = DailyManager.checkAndResetDaily(gameData);
@@ -5333,6 +5354,7 @@ class MainMenuScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.scale;
+        AnalyticsManager.setScreenName('MainMenuScene');
 
         AudioManager.playBgm(this, 'bgm_select');
 
@@ -6535,6 +6557,10 @@ class GameScene extends Phaser.Scene {
             DailyManager.updateProgress(gameData, 'challenge_try');
         }
 
+        AnalyticsManager.setScreenName('GameScene');
+        AnalyticsManager.logLevelStart(this.mode, this.mode === 'challenge' ? this.chalScore : this.lvIndex);
+        this._levelStartTime = Date.now();
+
         this.createBackground();
         this.loadLevel();
         this.createGrid();
@@ -6806,6 +6832,19 @@ class GameScene extends Phaser.Scene {
     checkLegendEncounter() {
         const selectedDogs = gameData.selectedDogs || [];
         const equippedCostume = gameData.equippedCostumes?.hat || null;
+
+        // ゴリラモードON時: チャレンジ1回クリア後の次回でゴリラを確定出現
+        if (GORILLA_MODE_ENABLED) {
+            const gorillaLegend = LEGEND_ENCOUNTERS[40];
+            const challengeClears = gameData.stats?.totalChallengeClears || 0;
+            const shouldForceGorilla = gorillaLegend &&
+                !GameData.isDogUnlocked(gameData, gorillaLegend.id) &&
+                challengeClears === 1;
+
+            if (shouldForceGorilla) {
+                return gorillaLegend;
+            }
+        }
         
         // すべての伝説ワンコをチェック
         for (const legendId of Object.keys(LEGEND_ENCOUNTERS)) {
@@ -7025,6 +7064,15 @@ class GameScene extends Phaser.Scene {
             gameData.settings.bgmEnabled = on;
             AudioManager.setBgmEnabled(on);
             GameData.save(gameData);
+        });
+
+        // 📳 振動トグル - バイブレーションアイコン
+        this.vibBtn = this.createToggleButton(width - 130, footerY, 'icon_vibration', gameData.settings?.vibrationEnabled !== false, (on) => {
+            gameData.settings = gameData.settings || {};
+            gameData.settings.vibrationEnabled = on;
+            HapticManager.isEnabled = on;
+            GameData.save(gameData);
+            if (on) HapticManager.impact('Light');
         });
 
         // 🔈 SEトグル（右側）- スピーカーアイコン
@@ -7838,6 +7886,9 @@ class GameScene extends Phaser.Scene {
         // 通常モード: パズルなのでクリア=ノーミス
         // エンドレス: 途中でミスするとゲームオーバーなので、クリア=ノーミス
         DailyManager.updateProgress(gameData, 'perfect');
+
+        const elapsedMs = Date.now() - (this._levelStartTime || Date.now());
+        AnalyticsManager.logLevelComplete(this.mode, this.mode === 'challenge' ? this.chalScore : this.lvIndex, elapsedMs);
 
         // 実績チェック（ワンコ）
         const newAchievements = GameData.checkAchievements(gameData);
@@ -9508,6 +9559,9 @@ class GameOverScene extends Phaser.Scene {
         const { width, height } = this.scale;
         const selectedDogs = gameData.selectedDogs;
 
+        AnalyticsManager.setScreenName('GameOverScene');
+        AnalyticsManager.logChallengeScore(this.score);
+
         // BGMを停止（即座に）
         AudioManager.stopBgm(0);
 
@@ -9722,6 +9776,7 @@ class ShopScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.scale;
+        AnalyticsManager.setScreenName('ShopScene');
 
         AudioManager.playBgm(this, 'bgm_select');
 
@@ -10461,6 +10516,7 @@ class ShopScene extends Phaser.Scene {
             loadingText.destroy();
 
             if (purchaseResult.success) {
+                AnalyticsManager.logPurchase(product.id, true);
                 HapticManager.notification('Success');
                 AudioManager.playSfx(this, 'sfx_achievement');
 
@@ -10638,15 +10694,15 @@ class SettingsScene extends Phaser.Scene {
         const startY = SAFE.TOP + 100;
 
         // ========================================
-        // 🔊 サウンド設定セクション
+        // 🔊 サウンド・振動設定セクション
         // ========================================
         const soundSectionBg = this.add.graphics();
         // 影
         soundSectionBg.fillStyle(0x90A4AE, 0.25);
-        soundSectionBg.fillRoundedRect(18, startY - 15, width - 32, 175, 16);
+        soundSectionBg.fillRoundedRect(18, startY - 15, width - 32, 245, 16);
         // メイン背景
         soundSectionBg.fillStyle(0xFAFAFA, 0.98);
-        soundSectionBg.fillRoundedRect(15, startY - 20, width - 30, 175, 16);
+        soundSectionBg.fillRoundedRect(15, startY - 20, width - 30, 245, 16);
         // 上部アクセントライン（グレー！）
         soundSectionBg.fillStyle(0x607D8B, 0.5);
         soundSectionBg.fillRoundedRect(15, startY - 20, width - 30, 5, { tl: 16, tr: 16, bl: 0, br: 0 });
@@ -10675,10 +10731,22 @@ class SettingsScene extends Phaser.Scene {
             }
         );
 
+        // 📳 バイブレーション ON/OFF トグル
+        this.createSettingToggle(width / 2, startY + 180, '📳 しんどう',
+            gameData.settings?.vibrationEnabled !== false,
+            (on) => {
+                gameData.settings = gameData.settings || {};
+                gameData.settings.vibrationEnabled = on;
+                HapticManager.isEnabled = on;
+                GameData.save(gameData);
+                if (on) HapticManager.impact('Light');
+            }
+        );
+
         // ========================================
         // 📋 その他セクション（ストア要件対応）
         // ========================================
-        const otherSectionY = startY + 200;
+        const otherSectionY = startY + 270;
         const otherSectionBg = this.add.graphics();
         // 影
         otherSectionBg.fillStyle(0x90A4AE, 0.25);
@@ -10766,6 +10834,65 @@ class SettingsScene extends Phaser.Scene {
             bg.fillRoundedRect(-btnW / 2, -24, btnW, 48, 12);
             bg.lineStyle(2, 0xE0E0E0, 1);
             bg.strokeRoundedRect(-btnW / 2, -24, btnW, 48, 12);
+        });
+
+        return container;
+    }
+
+    createSettingToggle(x, y, label, isOn, cb) {
+        const { width } = this.scale;
+        const toggleW = width - 70;
+        const container = this.add.container(x, y);
+
+        const rowBg = this.add.graphics();
+        rowBg.fillStyle(0xFFFFFF, 1);
+        rowBg.fillRoundedRect(-toggleW / 2, -22, toggleW, 44, 12);
+        rowBg.lineStyle(2, 0xE0E0E0, 1);
+        rowBg.strokeRoundedRect(-toggleW / 2, -22, toggleW, 44, 12);
+
+        const labelText = this.add.text(-toggleW / 2 + 16, 0, label, {
+            fontFamily: 'KeiFont, sans-serif',
+            fontSize: '17px',
+            color: '#5D4037',
+            stroke: '#FFFFFF',
+            strokeThickness: 2,
+        }).setOrigin(0, 0.5);
+
+        const switchX = toggleW / 2 - 40;
+        const switchBg = this.add.graphics();
+        const knob = this.add.graphics();
+
+        const drawSwitch = (on) => {
+            switchBg.clear();
+            switchBg.fillStyle(on ? 0x4CAF50 : 0xBDBDBD, 1);
+            switchBg.fillRoundedRect(switchX - 22, -12, 44, 24, 12);
+
+            knob.clear();
+            knob.fillStyle(0xFFFFFF, 1);
+            knob.fillCircle(on ? switchX + 12 : switchX - 12, 0, 9);
+            knob.lineStyle(1.5, on ? 0x2E7D32 : 0x9E9E9E, 1);
+            knob.strokeCircle(on ? switchX + 12 : switchX - 12, 0, 9);
+        };
+        drawSwitch(isOn);
+
+        container.add([rowBg, labelText, switchBg, knob]);
+        container.setSize(toggleW, 44);
+        container.setInteractive({ useHandCursor: true });
+        container.setData('on', isOn);
+
+        container.on('pointerdown', () => {
+            this.tweens.add({ targets: container, scale: 0.97, duration: 50 });
+        });
+        container.on('pointerup', () => {
+            this.tweens.add({ targets: container, scale: 1, duration: 100, ease: 'Back.easeOut' });
+            const newState = !container.getData('on');
+            container.setData('on', newState);
+            drawSwitch(newState);
+            AudioManager.playSfx(this, 'sfx_ui_tap');
+            cb(newState);
+        });
+        container.on('pointerout', () => {
+            this.tweens.add({ targets: container, scale: 1, duration: 80 });
         });
 
         return container;

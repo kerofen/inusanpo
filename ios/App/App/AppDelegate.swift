@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AVFoundation
+import FirebaseCore
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,6 +9,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        FirebaseApp.configure()
+        
         // 🔊 AudioSession設定: サイレントモードでも音声を再生可能にする
         do {
             let audioSession = AVAudioSession.sharedInstance()

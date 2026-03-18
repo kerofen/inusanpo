@@ -27,6 +27,10 @@ www/
 android/key.properties
 android/release-key.jks
 
+# Firebase設定ファイル（プロジェクト固有の秘密情報を含む）
+android/app/google-services.json
+ios/App/App/GoogleService-Info.plist
+
 # OS
 .DS_Store
 Thumbs.db

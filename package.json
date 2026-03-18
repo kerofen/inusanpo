@@ -1,6 +1,6 @@
 {
   "name": "inusanpo",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "ワンこねくと - 一筆書きパズルゲーム",
   "main": "main.js",
   "scripts": {
@@ -29,9 +29,11 @@
   "license": "ISC",
   "dependencies": {
     "@capacitor-community/admob": "^7.2.0",
+    "@capacitor-firebase/analytics": "^6.0.0",
     "@capacitor/browser": "^6.0.6",
     "@capacitor/haptics": "^6.0.3",
     "@capgo/native-purchases": "^6.0.42",
+    "firebase": "^10.14.1",
     "phaser": "^3.80.1",
     "sharp": "^0.34.5"
   },
